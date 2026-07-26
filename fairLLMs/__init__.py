@@ -1,11 +1,10 @@
 """fairLLMs: fairness definitions and bias metrics for large language models.
 
-Phase 1 shared infrastructure lives under ``datasets``, ``models``, and
-``utils``. Metric leaf scripts under ``definition/`` remain runnable; Phase 2
-will wrap them behind a sklearn-style ``metric.compute(...)`` API.
+Shared infrastructure: ``datasets``, ``models``, ``utils``.
+Public metric API: ``metrics`` (sklearn-style ``metric.compute(...)``).
 """
 
-from fairLLMs import datasets, models, utils
+from fairLLMs import datasets, metrics, models, utils
 
-__all__ = ["datasets", "models", "utils"]
+__all__ = ["datasets", "metrics", "models", "utils"]
 __version__ = "0.1.0"

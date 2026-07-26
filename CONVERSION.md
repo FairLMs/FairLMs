@@ -1,6 +1,6 @@
 # Converting fairLLMs to a sklearn-style library
 
-**Where we are:** Phase 1 is done. Shared `datasets/`, `models/`, and `utils/` exist; metric math still lives as leaf scripts under `definition/`.
+**Where we are:** Phases 1–2 are done. Shared `datasets/`, `models/`, `utils/`, and a flat `metrics/` API with `compute()` wrappers exist. Leaf math still lives under `definition/` (called by wrappers).
 
 **Goal:** Researchers import a metric and call one method — without knowing the folder path.
 
@@ -25,6 +25,7 @@ print(result.score)
 | Dataset loaders | `fairLLMs/datasets/` (`CrowSPairs`, `StereoSet`, `BBQ`, …) |
 | Model adapters | `fairLLMs/models/` (`HuggingFaceModel`, `OpenAIModel`, `load_*`) |
 | Shared helpers | `fairLLMs/utils/` (PLL, masking, association, paths) |
+| Metric API | `fairLLMs/metrics/` (33 classes, all expose `compute`) |
 | Canonical data | `fairLLMs/data/` (CrowS CSV, BBQ jsonl) |
 | Install + docs | `pyproject.toml`, `README.md` |
 
@@ -32,27 +33,12 @@ print(result.score)
 
 ## Remaining work
 
-### Phase 2 — Metric API (core conversion)
+### Phase 2 — Metric API — DONE
 
-1. **Add contracts**
-   - `fairLLMs/metrics/base.py`: `FairnessMetric` ABC with `compute(model, dataset=None, **kwargs) -> MetricResult`
-   - `MetricResult` with at least `.score` (optional `.details`, `.by_category`)
-
-2. **Wrap existing `compute_*` functions** — do not rewrite the math
-   - Create `fairLLMs/metrics/` (flat public surface)
-   - One class per metric, e.g. `CrowSPairsScore` → calls `cps.compute_cps(...)`
-   - Pilot first: **CPS**, then **LPBS**, then **WEAT/SEAT**
-   - Roll through the remaining ~30 leaves with the same pattern
-
-3. **Wire adapters inside `compute`**
-   - Accept `HuggingFaceModel` / `LoadedModel` / raw HF objects
-   - Accept `CrowSPairs()`-style datasets or preloaded example lists
-   - Map dataset schemas → whatever the existing `compute_*` expects
-
-4. **Export cleanly**
-   ```python
-   from fairLLMs.metrics import CrowSPairsScore, LogProbabilityBiasScore, WEAT
-   ```
+- `fairLLMs/metrics/base.py`: `FairnessMetric`, `MetricResult`
+- All **33** metrics wrapped and exported from `fairLLMs.metrics`
+- Adapters accept `HuggingFaceModel` / `LoadedModel` / OpenAI / raw objects
+- Registry: `list_metrics()`, `get_metric(name)`
 
 ### Phase 3 — Book taxonomy aliases
 
@@ -79,15 +65,12 @@ print(result.score)
 
 ---
 
-## Suggested order
+## Suggested order (next)
 
 ```
-base.py + MetricResult
-    → wrap CPS (end-to-end reference)
-        → wrap LPBS, WEAT
-            → definitions/ re-exports
-                → remaining metrics
-                    → examples + tests + cleanup
+definitions/ re-exports (Phase 3)
+    → demote main.py → examples/ (Phase 4)
+        → tests + data cleanup (Phase 5)
 ```
 
 ## Success check

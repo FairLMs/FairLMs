@@ -4,7 +4,7 @@ Fairness definitions and bias metrics for large language models — a companion 
 
 The long-term goal is a **stable, sklearn-style API**: import a metric, call `compute(...)`, and get a result — without caring where the implementation lives.
 
-> **Status:** Phase 1 (shared infrastructure). Metric math still lives under `fairLLMs/definition/`; the public `metrics` layer with a uniform `compute()` interface is next.
+> **Status:** Phase 2 (public metric API). Import metrics from `fairLLMs.metrics` and call `compute(...)`. Implementation math still lives under `fairLLMs/definition/`.
 
 ## Install
 
@@ -22,61 +22,48 @@ pip install -e ".[all]"      # openai + common extras
 
 Requires Python ≥ 3.9. Core deps: `torch`, `transformers`, `datasets`, `numpy`, `pandas`, `scipy`.
 
-## Quick start (Phase 1)
+## Quick start
 
-Shared loaders and model adapters are ready to use today:
+```python
+from fairLLMs.metrics import CrowSPairsScore, LogProbabilityBiasScore, list_metrics
+from fairLLMs.datasets import CrowSPairs
+from fairLLMs.models import HuggingFaceModel
+
+model = HuggingFaceModel("bert-base-uncased", task="mlm")
+result = CrowSPairsScore().compute(model=model, dataset=CrowSPairs(n_max=50))
+print(result.score, result.by_category)
+
+# Discover metrics
+print(list_metrics())
+```
+
+Shared loaders:
 
 ```python
 from fairLLMs.datasets import CrowSPairs, BBQ, StereoSet
-from fairLLMs.models import load_masked_lm, HuggingFaceModel
+from fairLLMs.models import load_masked_lm
 
-# Datasets
-crows = CrowSPairs().load()          # stereotype / anti_stereotype pairs
-bbq = BBQ(categories=["Age"]).load() # BBQ jsonl rows
-# stereoset = StereoSet().load()     # downloads from Hugging Face
-
-# Models
+crows = CrowSPairs().load()
+bbq = BBQ(categories=["Age"]).load()
 loaded = load_masked_lm("bert-base-uncased")
-tokenizer, model, device = loaded.tokenizer, loaded.model, loaded.device
-
-# Or more generally:
-hf = HuggingFaceModel("bert-base-uncased", task="mlm").load()
 ```
 
-Existing metric runners (pre-API) still work, for example:
-
-```bash
-python -m fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.pseudo_log_likelihood_metrics.cps.main
-```
+Leaf runners under `definition/` still work for development.
 
 ## Package layout
 
 ```
 fairLLMs/
+├── metrics/        # Public API: CrowSPairsScore, WEAT, … (all expose compute)
 ├── datasets/       # CrowSPairs, StereoSet, BBQ, BiasInBios, WinoBias, …
 ├── models/         # HuggingFaceModel, OpenAIModel, load_* helpers
 ├── utils/          # PLL / masking / association / path helpers
 ├── data/           # Bundled CrowS-Pairs + BBQ files
 ├── artifacts/      # Preferred output dir for metric CSVs
-└── definition/     # Book taxonomy + current metric implementations
-    ├── encoder_only/
-    ├── encoder_decoder/
-    └── decoder_only/
+└── definition/     # Internal implementations (book taxonomy)
 ```
 
-### Intended public API (upcoming)
-
-```python
-from fairLLMs.metrics import CrowSPairsScore
-from fairLLMs.datasets import CrowSPairs
-from fairLLMs.models import HuggingFaceModel
-
-model = HuggingFaceModel("bert-base-uncased", task="mlm")
-result = CrowSPairsScore().compute(model=model, dataset=CrowSPairs())
-print(result.score)
-```
-
-Every metric will expose the same method: `compute(...)`.
+Every metric exposes the same method: `compute(...)`.
 
 ## Datasets
 
