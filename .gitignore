@@ -1,0 +1,30 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual envs / tooling
+.venv/
+venv/
+.env
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+
+# Metric run artifacts (prefer fairLLMs/artifacts/)
+fairLLMs/artifacts/*
+!fairLLMs/artifacts/.gitkeep
+**/*_results.csv
+**/ceat_embeddings*.pkl
+**/*.pickle
+
+# Large local corpora / archives (over GitHub's 100MB limit; keep on disk only)
+**/red_pill_corpus.csv
+**/nyu-mll BBQ main data.zip
+**/*.zip
