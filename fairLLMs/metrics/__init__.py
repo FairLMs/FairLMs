@@ -1,52 +1,64 @@
 """Public sklearn-style metric API.
 
 Every metric exposes ``compute(model, dataset=None, **kwargs) -> MetricResult``.
+
+Modules are grouped by metric family (e.g. ``similarity_based`` for WEAT/SEAT/CEAT).
 """
 
-from fairLLMs.metrics.base import FairnessMetric, MetricResult
-from fairLLMs.metrics.cat import ContextAssociationTestScore
-from fairLLMs.metrics.crows_pairs import CrowSPairsScore
-from fairLLMs.metrics.decoder_only import (
-    AccuracyDisparity,
-    BiasAmplifierScore,
-    CooccurrenceAssociation,
-    CounterfactualFairnessScore,
-    CounterfactualRobustness,
-    DemographicNextTokenProportion,
-    DemographicRepresentationDivergence,
-    GradientBasedBiasEstimation,
-    NaturalIndirectEffect,
-    SensitiveNameSimilarity,
-    StereotypicalLogLikelihood,
-)
-from fairLLMs.metrics.encoder_decoder import (
-    CounterfactualAucScore,
-    InferenceBiasScore,
+from fairLLMs.metrics.algorithmic_disparity import (
     LexicalFrequencyProportion,
     MorphologicalChoiceDivergence,
+)
+from fairLLMs.metrics.attention_head import (
+    GradientBasedBiasEstimation,
+    NaturalIndirectEffect,
+)
+from fairLLMs.metrics.base import FairnessMetric, MetricResult
+from fairLLMs.metrics.counterfactual_fairness import (
+    CounterfactualFairnessScore,
+    CounterfactualRobustness,
+)
+from fairLLMs.metrics.demographic_representation import (
+    DemographicNextTokenProportion,
+    DemographicRepresentationDivergence,
+)
+from fairLLMs.metrics.encoder_decoder_extrinsic import (
+    CounterfactualAucScore,
+    InferenceBiasScore,
     NormalizedPositionDistance,
+    TranslationSimilarityScore,
+)
+from fairLLMs.metrics.encoder_decoder_stereotypical import (
     StereotypicalDivergence,
     StereotypicalValueAttribution,
-    TranslationSimilarityScore,
 )
 from fairLLMs.metrics.encoder_extrinsic import (
     ContextBasedDisparityScore,
     EqualOpportunityGap,
     FairInferenceScore,
 )
-from fairLLMs.metrics.lpbs import LogProbabilityBiasScore
 from fairLLMs.metrics.masked_token import (
-    CEAT,
     ContrastBasedScore,
     DiscoveryOfCorrelationsScore,
+    LogProbabilityBiasScore,
 )
-from fairLLMs.metrics.pll_family import (
+from fairLLMs.metrics.performance_disparity import (
+    AccuracyDisparity,
+    BiasAmplifierScore,
+    SensitiveNameSimilarity,
+)
+from fairLLMs.metrics.pseudo_log_likelihood import (
     AllUnmaskedLikelihoodAttentionScore,
     AllUnmaskedLikelihoodScore,
+    ContextAssociationTestScore,
+    CrowSPairsScore,
     PseudoLogLikelihoodScore,
 )
-from fairLLMs.metrics.seat import SEAT
-from fairLLMs.metrics.weat import WEAT
+from fairLLMs.metrics.similarity_based import CEAT, SEAT, WEAT
+from fairLLMs.metrics.stereotypical_association import (
+    CooccurrenceAssociation,
+    StereotypicalLogLikelihood,
+)
 
 # Short aliases used in papers / book chapters
 CPS = CrowSPairsScore

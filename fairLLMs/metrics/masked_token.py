@@ -1,8 +1,8 @@
-"""Remaining encoder-only intrinsic metric wrappers (CEAT, DisCo, CBS)."""
+"""Masked-token metrics: DisCo, LPBS, CBS."""
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Tuple
 
 from fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.masked_token_metrics.cbs.cbs import (  # noqa: E501
     compute_cbs,
@@ -10,52 +10,12 @@ from fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.masked_to
 from fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.masked_token_metrics.disco.disco import (  # noqa: E501
     compute_disco,
 )
-from fairLLMs.definition.encoder_only.intrinsic_bias.similarity_based.ceat.ceat import (
-    compute_ceat,
+from fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.masked_token_metrics.lpbs.lpbs import (  # noqa: E501
+    DEFAULT_TEMPLATE,
+    compute_lpbs,
 )
 from fairLLMs.metrics.base import FairnessMetric, MetricResult
 from fairLLMs.metrics.resolve import get_tokenizer_model, require_kwargs
-
-
-class CEAT(FairnessMetric):
-    """Contextualized Embedding Association Test."""
-
-    name = "ceat"
-    bias_type = "intrinsic"
-    architectures = ("encoder_only",)
-
-    def __init__(
-        self,
-        pooling: str = "cls",
-        sample_size: int = 10,
-        n_trials: int = 100,
-        seed: Optional[int] = None,
-    ):
-        self.pooling = pooling
-        self.sample_size = sample_size
-        self.n_trials = n_trials
-        self.seed = seed
-
-    def compute(self, model: Any = None, dataset: Any = None, **kwargs: Any) -> MetricResult:
-        tokenizer, hf_model, device = get_tokenizer_model(model, kwargs.get("tokenizer"))
-        require_kwargs(kwargs, "T1_contexts", "T2_contexts", "A1_contexts", "A2_contexts")
-        result = compute_ceat(
-            hf_model,
-            tokenizer,
-            kwargs["T1_contexts"],
-            kwargs["T2_contexts"],
-            kwargs["A1_contexts"],
-            kwargs["A2_contexts"],
-            pooling=kwargs.get("pooling", self.pooling),
-            sample_size=kwargs.get("sample_size", self.sample_size),
-            n_trials=kwargs.get("n_trials", self.n_trials),
-            seed=kwargs.get("seed", self.seed),
-            device=device,
-        )
-        return MetricResult(
-            score=float(result["CES"]),
-            details=dict(result),
-        )
 
 
 class DiscoveryOfCorrelationsScore(FairnessMetric):
@@ -72,10 +32,8 @@ class DiscoveryOfCorrelationsScore(FairnessMetric):
         self.templates = templates
 
     def compute(self, model: Any = None, dataset: Any = None, **kwargs: Any) -> MetricResult:
-        # ``model`` may be a fill-mask pipeline, or we build one from an MLM.
         pipe = kwargs.get("pipe", model)
         if pipe is not None and not callable(getattr(pipe, "__call__", None)):
-            # LoadedModel / HuggingFaceModel → build pipeline
             from transformers import pipeline
 
             tokenizer, hf_model, device = get_tokenizer_model(model, kwargs.get("tokenizer"))
@@ -109,6 +67,70 @@ class DiscoveryOfCorrelationsScore(FairnessMetric):
         )
 
 
+class LogProbabilityBiasScore(FairnessMetric):
+    """Kurita et al. log-probability bias score for masked LMs.
+
+    Pass target attributes via ``attribute_words`` (or ``dataset`` as a list of
+    attribute strings). Demographic pair defaults to ``("he", "she")``.
+    """
+
+    name = "log_probability_bias_score"
+    bias_type = "intrinsic"
+    architectures = ("encoder_only",)
+
+    def __init__(
+        self,
+        gender_words: Tuple[str, str] = ("he", "she"),
+        template: str = DEFAULT_TEMPLATE,
+        gender_comes_first: bool = True,
+    ):
+        self.gender_words = gender_words
+        self.template = template
+        self.gender_comes_first = gender_comes_first
+
+    def compute(self, model: Any = None, dataset: Any = None, **kwargs: Any) -> MetricResult:
+        tokenizer, hf_model, _ = get_tokenizer_model(model, kwargs.get("tokenizer"))
+        attribute_words = kwargs.get("attribute_words")
+        if attribute_words is None and dataset is not None:
+            if hasattr(dataset, "load"):
+                examples = list(dataset.load())
+            else:
+                examples = list(dataset)
+            if examples and isinstance(examples[0], dict):
+                attribute_words = [
+                    ex.get("profession_name") or ex.get("attribute") or ex.get("word")
+                    for ex in examples
+                ]
+                attribute_words = [a for a in attribute_words if a]
+            else:
+                attribute_words = examples
+        if not attribute_words:
+            raise ValueError(
+                "Provide attribute_words=... or a dataset of attribute strings"
+            )
+        gender_words = kwargs.get("gender_words", self.gender_words)
+        template = kwargs.get("template", self.template)
+        gender_comes_first = kwargs.get("gender_comes_first", self.gender_comes_first)
+
+        outcomes, mean_lpbs, std_lpbs, prop = compute_lpbs(
+            tokenizer,
+            hf_model,
+            gender_words,
+            attribute_words,
+            template=template,
+            gender_comes_first=gender_comes_first,
+        )
+        return MetricResult(
+            score=float(mean_lpbs),
+            details={
+                "std": std_lpbs,
+                "proportion_favoring_group1": prop,
+                "outcomes": outcomes,
+                "n_attributes": len(attribute_words),
+            },
+        )
+
+
 class ContrastBasedScore(FairnessMetric):
     """Contrast-based masked preference score (CBS)."""
 
@@ -136,12 +158,10 @@ class ContrastBasedScore(FairnessMetric):
             group_placeholder=kwargs.get("group_placeholder", "{N}"),
             attr_placeholder=kwargs.get("attr_placeholder", "{A}"),
         )
-        # Primary score: confirmatory stereo CBS when present
         stereo = info.get("stereo") if isinstance(info, dict) else None
         if isinstance(stereo, dict) and "cbs" in stereo:
             score = float(stereo["cbs"])
         else:
-            # fall back to mean exploratory cbs
             scores = [
                 v.get("cbs")
                 for v in (per_group or {}).values()

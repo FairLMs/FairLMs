@@ -1,4 +1,4 @@
-"""PLL-family wrappers sharing the CrowS-Pairs pair schema."""
+"""Pseudo-log-likelihood metrics: PLL, CPS, AUL, AULA, CAT."""
 
 from __future__ import annotations
 
@@ -9,6 +9,12 @@ from fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.pseudo_lo
 )
 from fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.pseudo_log_likelihood_metrics.aula.aula import (  # noqa: E501
     compute_aula,
+)
+from fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.pseudo_log_likelihood_metrics.cat.cat import (  # noqa: E501
+    compute_ss,
+)
+from fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.pseudo_log_likelihood_metrics.cps.cps import (  # noqa: E501
+    compute_cps,
 )
 from fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.pseudo_log_likelihood_metrics.pll.pll import (  # noqa: E501
     compute_pll,
@@ -28,6 +34,24 @@ def _run_pair_metric(compute_fn, model, dataset, tokenizer=None, **compute_kwarg
         details={"accuracy": accuracy, "n_pairs": len(pairs)},
         by_category=dict(per_bias_type),
     )
+
+
+class CrowSPairsScore(FairnessMetric):
+    """Pseudo-log-likelihood CrowS-Pairs Score (Nangia et al.).
+
+    ``dataset`` should yield dicts with keys
+    ``stereotype``, ``anti_stereotype``, and optionally ``bias_type``
+    (see :class:`~fairLLMs.datasets.CrowSPairs`).
+    """
+
+    name = "crows_pairs_score"
+    bias_type = "intrinsic"
+    architectures = ("encoder_only",)
+
+    def compute(self, model: Any = None, dataset: Any = None, **kwargs: Any) -> MetricResult:
+        return _run_pair_metric(
+            compute_cps, model, dataset, tokenizer=kwargs.get("tokenizer")
+        )
 
 
 class PseudoLogLikelihoodScore(FairnessMetric):
@@ -77,4 +101,45 @@ class AllUnmaskedLikelihoodAttentionScore(FairnessMetric):
             dataset,
             tokenizer=kwargs.get("tokenizer"),
             use_attention=kwargs.get("use_attention", True),
+        )
+
+
+class ContextAssociationTestScore(FairnessMetric):
+    """StereoSet-style SS / LMS / iCAT on sentence triples."""
+
+    name = "context_association_test"
+    bias_type = "intrinsic"
+    architectures = ("encoder_only",)
+
+    def compute(self, model: Any = None, dataset: Any = None, **kwargs: Any) -> MetricResult:
+        tokenizer, hf_model, _ = get_tokenizer_model(model, kwargs.get("tokenizer"))
+
+        stereo = kwargs.get("stereo_sentences")
+        anti = kwargs.get("anti_sentences")
+        related = kwargs.get("related_sentences")
+
+        if dataset is not None and None in (stereo, anti, related):
+            examples = get_examples(dataset) or []
+            stereo, anti, related = [], [], []
+            for ex in examples:
+                if isinstance(ex, dict):
+                    stereo.append(ex["stereotype"])
+                    anti.append(ex["anti_stereotype"])
+                    related.append(ex["unrelated"])
+                else:
+                    stereo.append(ex[0])
+                    anti.append(ex[1])
+                    related.append(ex[2])
+
+        if None in (stereo, anti, related):
+            raise ValueError(
+                "Provide stereo/anti/related sentence lists or a triples dataset"
+            )
+
+        ss, lms, icat, rows = compute_ss(
+            hf_model, tokenizer, stereo, anti, related
+        )
+        return MetricResult(
+            score=float(icat),
+            details={"ss": ss, "lms": lms, "rows": rows, "n": len(stereo)},
         )
