@@ -4,7 +4,9 @@ Fairness definitions and bias metrics for large language models — a companion 
 
 The long-term goal is a **stable, sklearn-style API**: import a metric, call `compute(...)`, and get a result — without caring where the implementation lives.
 
-> **Status:** Phase 2 (public metric API). Import metrics from `fairLLMs.metrics` and call `compute(...)`. Implementation math still lives under `fairLLMs/definition/`.
+> **Status:** Phases 1–2 and 4. Import metrics from `fairLLMs.metrics` and call
+> `compute(...)`. Leaf `main.py` files and `examples/` are short public-API demos.
+> Implementation math still lives under `fairLLMs/definition/`.
 
 ## Install
 
@@ -48,7 +50,13 @@ bbq = BBQ(categories=["Age"]).load()
 loaded = load_masked_lm("bert-base-uncased")
 ```
 
-Leaf runners under `definition/` still work for development.
+Leaf runners under `definition/` are short demos of the same public API:
+
+```bash
+python -m fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.pseudo_log_likelihood_metrics.cps.main
+```
+
+See also `examples/` at the repository root.
 
 ## Package layout
 
@@ -60,8 +68,10 @@ fairLLMs/
 ├── utils/          # PLL / masking / association / path helpers
 ├── data/           # Bundled CrowS-Pairs + BBQ files
 ├── artifacts/      # Preferred output dir for metric CSVs
-└── definition/     # Internal implementations (book taxonomy)
+└── definition/     # Internal implementations + short public-API demos (main.py)
 ```
+
+Repo-root `examples/` has additional runnable snippets.
 
 Every metric exposes the same method: `compute(...)`.
 

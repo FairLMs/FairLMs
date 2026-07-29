@@ -12,11 +12,26 @@ iCAT = lms × min(ss, 100 − ss) / 50
 
 `main.py` writes **`cat_score` = iCAT** only. Ideal iCAT → 100.
 
+## Public API
+
+```python
+from fairLLMs.metrics import ContextAssociationTestScore
+from fairLLMs.models import HuggingFaceModel
+
+result = ContextAssociationTestScore().compute(
+    model=HuggingFaceModel("bert-base-uncased", task="mlm"),
+    stereo_sentences=["The doctor was busy."],
+    anti_sentences=["The nurse was busy."],
+    related_sentences=["The weather was busy."],
+)
+print(result.score)
+```
+
 ## Files
 
 | File | Purpose |
 |---|---|
-| `main.py` | Entry point: loads BERT, builds triples from three datasets, writes `cat_results.csv` |
+| `main.py` | Short public-API demo using `ContextAssociationTestScore`; writes results CSV for continuity |
 | `cat.py` | Core: `sentence_pll`, `compute_ss` (returns ss, lms, iCAT) |
 | `crows_pairs_anonymized.csv` | Bundled CrowS-Pairs |
 | `cat_results.csv` | Output of the last run |
@@ -26,7 +41,7 @@ iCAT = lms × min(ss, 100 − ss) / 50
 | Dataset | Stereo/anti source | Unrelated sentence | Notes |
 |---|---|---|---|
 | StereoSet | HF `McGill-NLP/stereoset` **intrasentence** | native unrelated | iCAT meaningful |
-| CrowS-Pairs | bundled CSV | **word-shuffled** copy of the stereo sentence | synthetic unrelated → lms/iCAT less informative |
+| CrowS-Pairs | `fairLLMs.datasets.CrowSPairs` / `fairLLMs/data/crows_pairs/` | **word-shuffled** copy of the stereo sentence | synthetic unrelated → lms/iCAT less informative |
 | XNLI religion | religion swaps + templates | unrelated drawn from StereoSet unrelated pool | same caveat |
 
 ## Parameters and settings
@@ -40,9 +55,12 @@ iCAT = lms × min(ss, 100 − ss) / 50
 
 ## How to run
 
-From the **repository root**:
+**Preferred:** use the public API above (and/or examples under `examples/` at the repo root).
+
+**Optional legacy demo** from the repository root:
 
 ```bash
+pip install -e .
 python -m fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.pseudo_log_likelihood_metrics.cat.main
 ```
 

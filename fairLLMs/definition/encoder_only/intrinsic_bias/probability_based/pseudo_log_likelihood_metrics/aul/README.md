@@ -7,22 +7,36 @@ All Unmasked Likelihood (Kaneko & Bollegala, 2022): for each
 higher. The reported score is the percentage of pairs preferring the
 stereotype — **50% ≈ unbiased**.
 
+## Public API
+
+```python
+from fairLLMs.metrics import AllUnmaskedLikelihoodScore
+from fairLLMs.datasets import CrowSPairs
+from fairLLMs.models import HuggingFaceModel
+
+result = AllUnmaskedLikelihoodScore().compute(
+    model=HuggingFaceModel("bert-base-uncased", task="mlm"),
+    dataset=CrowSPairs(n_max=32),
+)
+print(result.score)
+```
+
 ## Files
 
 | File | Purpose |
 |---|---|
-| `main.py` | Entry point: loads BERT, loads three datasets, runs 20×80% subsample protocol, writes `aul_results.csv` |
+| `main.py` | Short public-API demo using `AllUnmaskedLikelihoodScore`; writes results CSV for continuity |
 | `aul.py` | Core: `compute_aul()` |
-| `crows_pairs_anonymized.csv` | Bundled CrowS-Pairs dataset |
+| `crows_pairs_anonymized.csv` | Prefer `fairLLMs.datasets.CrowSPairs` / bundled `fairLLMs/data/crows_pairs/` (legacy leaf CSV may remain) |
 | `aul_results.csv` | Output of the last run |
 
-Token scoring uses `score_sentence` in `fairLLMs/definition/encoder_only/utils.py`.
+Token scoring uses `score_sentence` in `fairLLMs.utils`.
 
 ## Datasets
 
 | Dataset | Source |
 |---|---|
-| CrowS-Pairs (all bias types, pooled) | bundled CSV |
+| CrowS-Pairs (all bias types, pooled) | `fairLLMs.datasets.CrowSPairs` / `fairLLMs/data/crows_pairs/` |
 | StereoSet (intersentence, validation) | HF `stereoset` |
 | XNLI religion | religion-term swaps + templates (`n_max=100000`) |
 
@@ -40,9 +54,12 @@ Token scoring uses `score_sentence` in `fairLLMs/definition/encoder_only/utils.p
 
 ## How to run
 
-From the **repository root**:
+**Preferred:** use the public API above (and/or examples under `examples/` at the repo root).
+
+**Optional legacy demo** from the repository root:
 
 ```bash
+pip install -e .
 python -m fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.pseudo_log_likelihood_metrics.aul.main
 ```
 

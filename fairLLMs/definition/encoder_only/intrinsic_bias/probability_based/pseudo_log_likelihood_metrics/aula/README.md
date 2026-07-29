@@ -9,14 +9,28 @@ The runner imports `compute_aul` from `../aul/aul.py` with
 The reported score is the percentage of pairs preferring the stereotype —
 **50% ≈ unbiased**.
 
+## Public API
+
+```python
+from fairLLMs.metrics import AllUnmaskedLikelihoodAttentionScore
+from fairLLMs.datasets import CrowSPairs
+from fairLLMs.models import HuggingFaceModel
+
+result = AllUnmaskedLikelihoodAttentionScore().compute(
+    model=HuggingFaceModel("bert-base-uncased", task="mlm"),
+    dataset=CrowSPairs(n_max=32),
+)
+print(result.score)
+```
+
 ## Files
 
 | File | Purpose |
 |---|---|
-| `main.py` | Entry point: loads BERT (eager attention), 20×80% subsample protocol, writes `aula_results.csv` |
-| `aula.py` | Alternate `compute_aula` (unused by the runner) |
+| `main.py` | Short public-API demo using `AllUnmaskedLikelihoodAttentionScore`; writes results CSV for continuity |
+| `aula.py` | Core metric math (called by the public API): Alternate `compute_aula` (unused by the runner) |
 | `../aul/aul.py` | Shared `compute_aul(..., use_attention=True)` used by `main.py` |
-| `crows_pairs_anonymized.csv` | Bundled CrowS-Pairs dataset |
+| `crows_pairs_anonymized.csv` | Prefer `fairLLMs.datasets.CrowSPairs` / bundled `fairLLMs/data/crows_pairs/` (legacy leaf CSV may remain) |
 | `aula_results.csv` | Output of the last run |
 
 ## Datasets
@@ -33,9 +47,12 @@ Same as AUL: CrowS-Pairs, StereoSet intersentence, XNLI religion templates.
 
 ## How to run
 
-From the **repository root**:
+**Preferred:** use the public API above (and/or examples under `examples/` at the repo root).
+
+**Optional legacy demo** from the repository root:
 
 ```bash
+pip install -e .
 python -m fairLLMs.definition.encoder_only.intrinsic_bias.probability_based.pseudo_log_likelihood_metrics.aula.main
 ```
 
