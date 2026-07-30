@@ -1,5 +1,10 @@
 # fairllms
 
+[![PyPI](https://img.shields.io/pypi/v/fairllms)](https://pypi.org/project/fairllms/)
+[![Python](https://img.shields.io/pypi/pyversions/fairllms)](https://pypi.org/project/fairllms/)
+[![Tests](https://github.com/michaellarionov/JMLR_Library/actions/workflows/test.yml/badge.svg)](https://github.com/michaellarionov/JMLR_Library/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Fairness definitions and bias metrics for large language models — a companion library for studying and evaluating bias in LMs.
 
 The long-term goal is a **stable, sklearn-style API**: import a metric, call `compute(...)`, and get a result — without caring where the implementation lives.
@@ -11,44 +16,50 @@ The long-term goal is a **stable, sklearn-style API**: import a metric, call `co
 
 ## Install
 
-### As a user
-
-Install from the repository, **pinned to a release tag**:
-
 ```bash
-pip install "git+ssh://git@github.com/michaellarionov/JMLR_Library.git@v0.2.0"
+pip install fairllms
 ```
 
-Pinning matters: installing from `@main` tracks unreleased work, so any push can
-change behaviour under you. Tags don't move.
+That's all most users need — [`fairllms` is on PyPI](https://pypi.org/project/fairllms/),
+so installing does not require access to this repository.
 
-The repository is private, so this needs credentials — the SSH form above uses
-your existing key. Over HTTPS, git will use your credential helper:
+### Optional extras
+
+```bash
+pip install "fairllms[openai]"   # API-backed decoder metrics (CR, CTF, BA)
+pip install "fairllms[dev]"      # pytest
+pip install "fairllms[all]"      # openai + common extras
+```
+
+### From source
+
+To track unreleased work, or to develop the library:
+
+```bash
+git clone https://github.com/michaellarionov/JMLR_Library.git && cd JMLR_Library && pip install -e ".[dev]"
+```
+
+An editable install means your edits take effect immediately, with no reinstall.
+You can also install a specific commit or tag directly:
 
 ```bash
 pip install "git+https://github.com/michaellarionov/JMLR_Library.git@v0.2.0"
 ```
 
+Prefer a tag over `@main` if you do this: `main` tracks unreleased work, so any
+push can change behaviour under you. Tags don't move.
+
 The import name is `fairllms` regardless of the repository name.
 
-### As a developer
+### Requirements
 
-Use an editable install so your edits take effect without reinstalling:
+Python ≥ 3.10 — the floor for `torch`, `transformers` and `datasets`.
 
-```bash
-pip install -e ".[dev]"
-```
-
-### Optional extras
-
-```bash
-pip install -e ".[openai]"   # API-backed decoder metrics (CR, CTF, BA)
-pip install -e ".[dev]"      # pytest
-pip install -e ".[all]"      # openai + common extras
-```
-
-Requires Python ≥ 3.10 (the floor for `torch`, `transformers` and `datasets`).
-Core deps: `torch`, `transformers`, `datasets`, `numpy`, `pandas`, `scipy`.
+Installed automatically: `torch`, `transformers`, `datasets`, `numpy`, `pandas`,
+`scipy`, `scikit-learn`, `wordfreq`, `nltk`. The last three are needed at import
+time by `counterfactual_auc` / `normalized_position_distance`,
+`lexical_frequency_proportion`, and `morphological_choice_divergence`
+respectively.
 
 ## Versioning
 
@@ -57,13 +68,16 @@ minor versions. The version is single-sourced in
 [`fairllms/_version.py`](fairllms/_version.py); `pyproject.toml` reads it via
 `[tool.setuptools.dynamic]`, so bump that one value.
 
-To cut a release:
+To cut a release, bump `_version.py`, then tag. Pushing a `v*` tag triggers
+[`.github/workflows/publish.yml`](.github/workflows/publish.yml), which builds,
+validates with `twine check --strict`, checks the tag matches the version, and
+uploads to PyPI via Trusted Publishing (OIDC — no API token is stored anywhere):
 
 ```bash
-git tag -a v0.2.0 -m "Release v0.2.0" && git push origin v0.2.0
+git tag -a "v$(python scripts/package_version.py)" -m "Release" && git push origin --tags
 ```
 
-Users then upgrade deliberately by changing the tag they pin.
+Users then upgrade with `pip install --upgrade fairllms`.
 
 ### Breaking changes
 
@@ -242,8 +256,18 @@ HF_HUB_OFFLINE=1 pytest -q     # what CI runs; a few seconds, no downloads
 ```
 
 CI ([`.github/workflows/test.yml`](.github/workflows/test.yml)) runs this on
-Python 3.10 and 3.13 for every push and pull request, and also asserts that
-`fairllms.__version__` matches the built distribution metadata.
+Python 3.10 and 3.13 for every push and pull request. A second `clean-install`
+job builds the wheel, installs it into a fresh environment, and imports it from a
+directory with no source checkout on `sys.path`.
+
+That second job exists because an editable install cannot catch a whole class of
+packaging bug: `fairllms.metrics` eagerly imports every metric family, so any
+third-party module imported at module scope under `fairllms/definition/` is a
+hard requirement of `import fairllms`. If such a dependency is only listed in an
+extra, `pip install fairllms` produces a package that cannot be imported — while
+every local test still passes, because the developer's environment already has
+it. [`tests/test_packaging.py`](tests/test_packaging.py) also guards this
+statically, walking the AST and naming the offending file.
 
 ### Publishing an edit
 
@@ -251,9 +275,10 @@ Edits reach users through a tagged release, not through `main`:
 
 1. Edit locally — your editable install picks changes up immediately.
 2. `pytest` — the contract suite catches API breakage before it ships.
-3. Commit and push. CI verifies the matrix.
-4. Bump `fairllms/_version.py`, then tag and push the tag.
-5. Users move to the new tag when they choose.
+3. Commit and push. CI verifies the matrix and the clean install.
+4. Bump [`fairllms/_version.py`](fairllms/_version.py), then tag and push the tag.
+5. The publish workflow uploads to PyPI; users get it with
+   `pip install --upgrade fairllms`.
 
 Metric result CSVs should go under `fairllms/artifacts/` (via `fairllms.utils.results_to_csv`); leaf-local `*_results.csv` files are gitignored.
 
