@@ -65,9 +65,34 @@ def test_init_stores_params_verbatim(name):
 def test_get_params_roundtrips(name):
     """``type(m)(**m.get_params())`` must reproduce an equivalent metric."""
     metric = get_metric(name)
-    params = metric.get_params()
-    clone = type(metric)(**params)
-    assert clone.get_params() == params
+    params = metric.get_params(deep=False)
+    rebuilt = type(metric)(**params)
+    assert rebuilt.get_params(deep=False) == params
+
+
+@pytest.mark.parametrize("name", ALL_METRICS)
+def test_get_params_accepts_deep(name):
+    """sklearn utilities always call ``get_params(deep=...)``."""
+    metric = get_metric(name)
+    shallow = metric.get_params(deep=False)
+    deep = metric.get_params(deep=True)
+    # deep is a superset: same top-level keys, possibly nested name__sub extras
+    assert set(shallow).issubset(set(deep))
+
+
+@pytest.mark.parametrize("name", ALL_METRICS)
+def test_works_with_sklearn_clone(name):
+    """``sklearn.base.clone`` must accept fairllms metrics.
+
+    This is the concrete payoff of following sklearn's parameter protocol: any
+    sklearn utility that clones by parameters works on these objects.
+    """
+    sklearn_base = pytest.importorskip("sklearn.base")
+    metric = get_metric(name)
+    cloned = sklearn_base.clone(metric)
+    assert type(cloned) is type(metric)
+    assert cloned is not metric
+    assert cloned.get_params(deep=False) == metric.get_params(deep=False)
 
 
 @pytest.mark.parametrize("name", ALL_METRICS)

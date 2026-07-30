@@ -62,13 +62,29 @@ class FairnessMetric(ABC):
         ]
         return sorted(names)
 
-    def get_params(self) -> Dict[str, Any]:
+    def get_params(self, deep: bool = True) -> Dict[str, Any]:
         """Return this metric's configuration as a dict.
 
         Mirrors ``sklearn.base.BaseEstimator.get_params``, so
-        ``type(m)(**m.get_params())`` reconstructs an equivalent metric.
+        ``type(m)(**m.get_params())`` reconstructs an equivalent metric and
+        ``sklearn.base.clone`` works on fairllms metrics.
+
+        Parameters
+        ----------
+        deep:
+            When ``True``, also report the parameters of any nested object that
+            exposes ``get_params``, under ``name__subname`` keys — sklearn's
+            convention. Accepting this argument is what lets sklearn utilities
+            (which always pass ``deep``) operate on these metrics.
         """
-        return {name: getattr(self, name) for name in self._param_names()}
+        params: Dict[str, Any] = {}
+        for name in self._param_names():
+            value = getattr(self, name)
+            params[name] = value
+            if deep and hasattr(value, "get_params") and not isinstance(value, type):
+                for sub_name, sub_value in value.get_params(deep=True).items():
+                    params[f"{name}__{sub_name}"] = sub_value
+        return params
 
     def set_params(self, **params: Any) -> "FairnessMetric":
         """Set configuration parameters in place and return ``self``."""
@@ -121,7 +137,7 @@ class FairnessMetric(ABC):
         """
 
     def __repr__(self) -> str:
-        params = self.get_params()
+        params = self.get_params(deep=False)
         defaults = {}
         if params:
             sig = inspect.signature(type(self).__init__).parameters
