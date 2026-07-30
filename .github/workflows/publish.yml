@@ -52,11 +52,15 @@ jobs:
 
       # Guards against the tag disagreeing with fairllms/_version.py, which
       # would publish a version nobody can reproduce from the tag.
+      #
+      # Reads the value via AST rather than a regex: _version.py has a docstring,
+      # and a naive quote-matching regex picks up the docstring quotes instead of
+      # the version string.
       - name: Verify tag matches package version
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           tag="${GITHUB_REF_NAME#v}"
-          pkg="$(python -c 'import re,pathlib; print(re.search(r"\"(.+?)\"", pathlib.Path("fairllms/_version.py").read_text()).group(1))')"
+          pkg="$(python scripts/package_version.py)"
           echo "tag=$tag package=$pkg"
           test "$tag" = "$pkg" || { echo "::error::tag v$tag != _version.py $pkg"; exit 1; }
 

@@ -124,6 +124,25 @@ def test_runtime_version_matches_version_module():
     assert fairllms.__version__ == _version.__version__
 
 
+def test_version_helper_script_agrees_with_package():
+    """scripts/package_version.py is what the release workflow tags against.
+
+    It must return the real version without importing fairllms. A regression here
+    means a release could be tagged with a version that isn't the package's.
+    """
+    import subprocess
+
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "scripts" / "package_version.py")],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    from fairllms import _version
+
+    assert result.stdout.strip() == _version.__version__
+
+
 def test_license_file_exists():
     """pyproject declares MIT; the file it points at must actually be there."""
     tomllib = pytest.importorskip("tomllib")
