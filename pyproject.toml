@@ -1,5 +1,6 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+# setuptools>=77 for PEP 639 SPDX license metadata.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,7 +11,34 @@ description = "Fairness definitions and bias metrics for large language models"
 readme = "README.md"
 # 3.10 is the real floor: torch, transformers and datasets all require >=3.10.
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Michael Larionov" },
+]
+keywords = [
+    "fairness",
+    "bias",
+    "large-language-models",
+    "nlp",
+    "evaluation",
+    "metrics",
+    "responsible-ai",
+]
+# No "License ::" classifier: PEP 639 supersedes it with the SPDX `license` field
+# above, and setuptools rejects declaring both.
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Linguistic",
+]
 
 dependencies = [
     "numpy>=1.24",
@@ -19,7 +47,25 @@ dependencies = [
     "torch>=2.0",
     "transformers>=4.38",
     "datasets>=2.19",
+    # These three are imported at module scope inside fairllms/definition/, and
+    # fairllms.metrics eagerly imports every family, so `import fairllms` fails
+    # without them. They are requirements, not extras:
+    #   scikit-learn -> counterfactual_auc, normalized_position_distance
+    #   wordfreq     -> lexical_frequency_proportion
+    #   nltk         -> morphological_choice_divergence (bundled SnowballStemmer,
+    #                   no corpus download needed)
+    # Making those imports lazy would let these move back to extras.
+    "scikit-learn>=1.3",
+    "wordfreq>=3.0",
+    "nltk>=3.8",
 ]
+
+# Keep table sections below all bare `[project]` keys — a bare key placed after a
+# `[table]` header is parsed as belonging to that table, not to [project].
+[project.urls]
+Homepage = "https://github.com/michaellarionov/JMLR_Library"
+Repository = "https://github.com/michaellarionov/JMLR_Library"
+Issues = "https://github.com/michaellarionov/JMLR_Library/issues"
 
 [project.optional-dependencies]
 openai = [
@@ -33,7 +79,6 @@ all = [
     "fairllms[openai,dev]",
     "accelerate>=0.30",
     "sentencepiece",
-    "scikit-learn",
     "gender-guesser",
     "tqdm",
 ]

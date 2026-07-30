@@ -56,3 +56,40 @@ jobs:
         env:
           HF_HUB_OFFLINE: "1"
         run: pytest -q
+
+  # Installs the built wheel into a fresh environment with no source checkout on
+  # sys.path. This is what catches dependencies that are imported at module
+  # scope but only declared in an extra — a bug an editable install cannot see,
+  # because the developer's environment already has them.
+  clean-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install CPU-only torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Build and validate distributions
+        run: |
+          pip install --upgrade build twine
+          python -m build
+          python -m twine check --strict dist/*
+
+      - name: Install the wheel and use it from outside the repo
+        run: |
+          pip install dist/*.whl
+          cd "$(mktemp -d)"
+          python -c "
+          import fairllms
+          from fairllms.metrics import list_metrics, equal_opportunity_gap
+          from fairllms.datasets import CrowSPairs
+          assert len(list_metrics()) == 33, list_metrics()
+          assert len(CrowSPairs(n_max=5).load()) == 5   # bundled data ships
+          equal_opportunity_gap([1, 1, 0], [1, 0, 0], ['A', 'B', 'A'], g1='A', g2='B')
+          print('clean install OK, version', fairllms.__version__)
+          "
