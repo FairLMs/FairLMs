@@ -1,7 +1,7 @@
-"""Log Probability Bias Score via the public fairLLMs API."""
+"""Log Probability Bias Score via the public fairllms API."""
 
-from fairLLMs.metrics import LogProbabilityBiasScore
-from fairLLMs.models import HuggingFaceModel
+from fairllms.metrics import LogProbabilityBiasScore
+from fairllms.models import HuggingFaceModel
 
 
 def main():

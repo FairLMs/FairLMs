@@ -1,6 +1,6 @@
-"""Accuracy Disparity via the public fairLLMs API (synthetic scores)."""
+"""Accuracy Disparity via the public fairllms API (synthetic scores)."""
 
-from fairLLMs.metrics import AccuracyDisparity
+from fairllms.metrics import AccuracyDisparity
 
 
 def main():

@@ -17,9 +17,9 @@ venv/
 .ruff_cache/
 .DS_Store
 
-# Metric run artifacts (prefer fairLLMs/artifacts/)
-fairLLMs/artifacts/*
-!fairLLMs/artifacts/.gitkeep
+# Metric run artifacts (prefer fairllms/artifacts/)
+fairllms/artifacts/*
+!fairllms/artifacts/.gitkeep
 **/*_results.csv
 **/ceat_embeddings*.pkl
 **/*.pickle

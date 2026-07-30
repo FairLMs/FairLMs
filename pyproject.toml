@@ -3,11 +3,13 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fairLLMs"
-version = "0.1.0"
+name = "fairllms"
+# Single-sourced from fairllms/_version.py — see [tool.setuptools.dynamic] below.
+dynamic = ["version"]
 description = "Fairness definitions and bias metrics for large language models"
 readme = "README.md"
-requires-python = ">=3.9"
+# 3.10 is the real floor: torch, transformers and datasets all require >=3.10.
+requires-python = ">=3.10"
 license = { text = "MIT" }
 
 dependencies = [
@@ -28,7 +30,7 @@ dev = [
     "pytest-cov",
 ]
 all = [
-    "fairLLMs[openai,dev]",
+    "fairllms[openai,dev]",
     "accelerate>=0.30",
     "sentencepiece",
     "scikit-learn",
@@ -36,12 +38,23 @@ all = [
     "tqdm",
 ]
 
+[tool.setuptools.dynamic]
+version = { attr = "fairllms._version.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    # Surface accidental use of the deprecated keyword API inside the library
+    # itself; tests that exercise it opt in with pytest.warns.
+    "ignore::DeprecationWarning:importlib._bootstrap",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["fairLLMs*"]
+include = ["fairllms*"]
 
 [tool.setuptools.package-data]
-fairLLMs = [
+fairllms = [
     "data/crows_pairs/*.csv",
     "data/bbq/*.jsonl",
 ]

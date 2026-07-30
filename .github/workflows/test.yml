@@ -1,0 +1,58 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Floor (per requires-python) and current. Widen if you support more.
+        python-version: ["3.10", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # The CUDA wheels are ~2 GB and unnecessary here — the suite is CPU-only.
+      - name: Install CPU-only torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install package
+        run: pip install -e ".[dev]"
+
+      # Catches packaging breakage and version drift between
+      # fairllms/_version.py and the built distribution metadata.
+      - name: Check import and version
+        run: |
+          python -c "import fairllms; print('version:', fairllms.__version__)"
+          python -c "
+          import importlib.metadata as m, fairllms
+          dist, run = m.version('fairllms'), fairllms.__version__
+          assert dist == run, f'version drift: dist={dist} runtime={run}'
+          print('version single-sourcing OK:', dist)
+          "
+
+      # HF_HUB_OFFLINE keeps the run hermetic and fast: the contract suite needs
+      # no model weights, and the model-backed tests skip cleanly without them.
+      #
+      # Note this job also guards the package rename. ubuntu is case-sensitive,
+      # so any leftover `import fairLLMs` fails here even though macOS would
+      # silently accept it.
+      - name: Run tests
+        env:
+          HF_HUB_OFFLINE: "1"
+        run: pytest -q

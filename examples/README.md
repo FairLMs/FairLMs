@@ -1,13 +1,13 @@
 # Examples
 
-Short scripts that use the **public** fairLLMs API:
+Short scripts that use the **public** fairllms API:
 
 ```python
-from fairLLMs.metrics import CrowSPairsScore
+from fairllms.metrics import CrowSPairsScore
 ```
 
-Leaf demos under `fairLLMs/definition/**/main.py` also call this API and remain
-runnable via `python -m fairLLMs.definition....main`. Prefer these examples
+Leaf demos under `fairllms/definition/**/main.py` also call this API and remain
+runnable via `python -m fairllms.definition....main`. Prefer these examples
 (or the Public API sections in each metric README) for new code.
 
 ## Quick start
