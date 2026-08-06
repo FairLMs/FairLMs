@@ -1,0 +1,3 @@
+recursive-include tests/data/golden *.json
+recursive-include docs *.md
+recursive-include examples *.md *.py

@@ -157,6 +157,194 @@ Also available: `inference_bias_score`, `fair_inference_score`,
 (`EqualOpportunityGap`, …) when you want the full `MetricResult` with
 diagnostics.
 
+### Dataset diagnostics
+
+Dataset diagnostics are a separate, dataset-first API. They consume explicit
+evidence and audit intent rather than a model, and return a structured report
+whose components can be `ready`, `blocked`, or `not_applicable`. Missing
+evidence is never represented as a score of zero.
+
+The first diagnostic is axis-level representativeness (`b_rep`): smoothed
+`KL(observed || reference)` in nats. It requires an explicit reference and its
+provenance; the package does not infer a population prior from a dataset name.
+
+```python
+from fairllms.diagnostics import (
+    DatasetAuditSpec,
+    ReferenceDistribution,
+    RepresentationEvidence,
+    audit_representativeness,
+)
+
+evidence = RepresentationEvidence(
+    axis="community",
+    counts={"amber": 3, "teal": 1},
+    source="My benchmark, evaluation split",
+)
+reference = ReferenceDistribution(
+    axis="community",
+    probabilities={"amber": 0.5, "teal": 0.5},
+    source="Benchmark design specification v1",
+    purpose="design_target",
+    population="Intended benchmark composition",
+)
+spec = DatasetAuditSpec(
+    target_name="my-unregistered-benchmark",
+    target_kind="benchmark_dataset",
+    task_family="free_text",
+    design_stance="stress_test",
+    references={"community": reference},
+)
+
+report = audit_representativeness(evidence, spec)
+result = report.components["b_rep"]
+print(result.status.value, result.value)
+print(report.to_json())
+```
+
+`population_proxy` and `stress_test` use the same mathematics but not the same
+interpretation. A stress test may deliberately over-sample a category; the
+report therefore warns that divergence is descriptive evidence rather than an
+automatic fairness failure. Use `RepresentationEvidence.from_records(...)` or
+`.from_dataframe(...)` with explicit field names, support, and optional value
+mapping for unfamiliar schemas. Adapters preserve the complete JSON-safe value
+mapping in provenance so a recoding can be reproduced. Reference probabilities
+outside an absolute `1e-9` sum tolerance are rejected; values inside that
+tolerance are canonicalized onto the probability simplex and the report records
+both the input sum and whether canonicalization occurred.
+
+Start with [Preparing audit evidence](docs/preparing_audit_evidence.md) for the
+evidence-layer boundary and input checklist. The detailed
+[representativeness guide](docs/preparing_representativeness_evidence.md)
+covers supported input paths, raw text, coverage, references, and a complete
+`b_rep` example.
+
+#### Scoring instrument audits
+
+Scorer diagnostics audit scores that already exist at row level. They do not
+infer groups from raw text or run a model/scorer to generate scores.
+`score_mean_gap` is the descriptive maximum absolute group-mean difference in
+the scorer's native score units. `score_rate_gap` first applies one explicit,
+serialized score-to-event rule to every group, then reports the maximum absolute
+group event-rate difference as a proportion. `score_wasserstein_1_gap` compares
+the complete one-dimensional empirical score distributions and reports their
+maximum pairwise Wasserstein-1 distance in the scorer's native score units.
+`score_counterfactual_sensitivity` separately averages absolute score changes
+inside complete, explicitly declared two-condition pairs.
+
+```python
+from fairllms.diagnostics import (
+    DatasetAuditSpec,
+    ScoreRateTransform,
+    ScoredGroups,
+    ScorerMeanGap,
+    ScorerRateGap,
+    ScorerWasserstein1Gap,
+    audit_scores,
+)
+
+evidence = ScoredGroups(
+    axis="cohort",
+    groups=("amber", "amber", "teal", "teal"),
+    scores=(0.1, 0.3, 0.8, 1.0),
+    score_name="example_safety_score",
+    source="Existing row-level score export v1",
+    score_range=(0.0, 1.0),
+)
+rate_transform = ScoreRateTransform(
+    event_name="score_at_or_above_policy_threshold",
+    threshold=0.5,
+    direction="higher",
+    inclusive=True,
+    provenance={"rule_source": "Example policy v1"},
+)
+spec = DatasetAuditSpec(
+    target_name="example-score-table",
+    target_kind="score_table",
+    task_family="scored_rows",
+    design_stance="stress_test",
+    references={},
+    requested_components=(
+        "score_mean_gap",
+        "score_rate_gap",
+        "score_wasserstein_1_gap",
+    ),
+)
+
+report = audit_scores(
+    evidence,
+    spec,
+    diagnostics=(
+        ScorerMeanGap(),
+        ScorerRateGap(transform=rate_transform),
+        ScorerWasserstein1Gap(),
+    ),
+)
+mean_result = report.components["score_mean_gap"]
+rate_result = report.components["score_rate_gap"]
+w1_result = report.components["score_wasserstein_1_gap"]
+print(mean_result.value, mean_result.details["unit"])  # 0.7 score_units
+print(rate_result.value, rate_result.details["unit"])  # 1.0 proportion
+print(w1_result.value, w1_result.details["unit"])  # 0.7 score_units
+```
+
+Paired sensitivity uses independent evidence because group marginals do not
+preserve which rows are counterparts:
+
+```python
+from fairllms.diagnostics import (
+    PairedScores,
+    ScorerCounterfactualSensitivity,
+)
+
+paired = PairedScores(
+    axis="declared_identity_intervention",
+    pair_ids=("p1", "p1", "p2", "p2"),
+    conditions=("baseline", "swap", "baseline", "swap"),
+    scores=(0.1, 0.4, 0.8, 0.3),
+    condition_roles=("baseline", "swap"),
+    score_name="example_safety_score",
+    source="Existing paired score export v1",
+    pairing_basis="Reviewed minimal identity-token substitutions",
+    score_range=(0.0, 1.0),
+)
+paired_spec = DatasetAuditSpec(
+    target_name="example-paired-score-table",
+    target_kind="score_table",
+    task_family="paired_sentences",
+    design_stance="stress_test",
+    references={},
+    requested_components=("score_counterfactual_sensitivity",),
+)
+paired_report = audit_scores(
+    paired,
+    paired_spec,
+    diagnostic=ScorerCounterfactualSensitivity(),
+)
+print(paired_report.components["score_counterfactual_sensitivity"].value)  # 0.4
+```
+
+There is no implicit threshold, direction, or boundary rule. `score_range`
+validates scores; it is neither a threshold nor a Wasserstein normalization. A
+missing rate transform is `blocked`, not a zero gap. Mean, rate, and W1 gaps
+answer different questions, and none is a causal claim, fairness pass/fail rule,
+or error-rate metric. Paired sensitivity supports identity-isolated causal
+language only if the pairs really differ solely in the declared intervention;
+the package validates pair completeness but cannot verify that semantic claim
+from scores. W1 and paired sensitivity are symmetric primary values and carry
+no higher/lower direction.
+`higher` plus `inclusive=True` is the paper-exact `score >= threshold`
+definition; the report marks lower-tail and exclusive-boundary variants
+separately. Treat each value as a per-dataset, per-scorer diagnostic, and rate
+gaps additionally as per-rule, rather than using them to rank datasets or
+unrelated scorer scales. See
+[Preparing audit evidence](docs/preparing_audit_evidence.md) and the runnable
+[`score_rate_gap`](examples/scorer_rate_gap_diagnostic.py) and
+[`score_wasserstein_1_gap`](examples/scorer_distribution_gap_diagnostic.py)
+and
+[`score_counterfactual_sensitivity`](examples/scorer_counterfactual_sensitivity_diagnostic.py)
+examples.
+
 Shared loaders:
 
 ```python
@@ -183,6 +371,7 @@ fairllms/
 ├── metrics/        # Public API: CrowSPairsScore, WEAT, … (all expose compute)
 │   ├── data.py     #   Validated input containers (WordSets, ProbeSet, …)
 │   └── functional.py #  sklearn.metrics-style functions (model-free metrics)
+├── diagnostics/    # Dataset/result-table evidence, applicability, and reports
 ├── datasets/       # CrowSPairs, StereoSet, BBQ, BiasInBios, WinoBias, …
 ├── models/         # HuggingFaceModel, OpenAIModel, load_* helpers
 ├── utils/          # PLL / masking / association / path helpers
@@ -233,6 +422,8 @@ Set `HF_TOKEN` (or `HUGGING_FACE_HUB_TOKEN`) for gated models such as Llama-2.
 2. **Separate metrics from datasets** — reuse the same metric on CrowS-Pairs, StereoSet, or custom data.
 3. **Stable public surface** — internals under `definition/` can change without breaking user code.
 4. **Book-aligned taxonomy** — `definition/{encoder_only,encoder_decoder,decoder_only}/{intrinsic_bias,extrinsic_bias}/…` mirrors the conceptual organization of the accompanying textbook.
+5. **Applicability before computation** — dataset diagnostics report missing or
+   incompatible evidence instead of manufacturing a numeric result.
 
 ## Development
 
