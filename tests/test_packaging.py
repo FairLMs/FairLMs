@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import shlex
 import sys
 
 import pytest
@@ -75,9 +76,7 @@ def _module_level_third_party_imports() -> dict[str, set[str]]:
             for name in names:
                 if name == "fairllms" or name in sys.stdlib_module_names:
                     continue
-                found.setdefault(name, set()).add(
-                    str(path.relative_to(REPO_ROOT))
-                )
+                found.setdefault(name, set()).add(str(path.relative_to(REPO_ROOT)))
     return found
 
 
@@ -151,3 +150,36 @@ def test_license_file_exists():
     assert cfg["project"]["license"] == "MIT"
     for rel in cfg["project"]["license-files"]:
         assert (REPO_ROOT / rel).is_file(), f"missing declared license file: {rel}"
+
+
+def test_sdist_manifest_includes_diagnostic_reproducibility_material():
+    """Golden fixtures, evidence guides, and examples ship in the source artifact."""
+    golden_root = REPO_ROOT / "tests" / "data" / "golden"
+    golden_json = sorted(golden_root.rglob("*.json"))
+    assert golden_json, "expected at least one golden JSON fixture"
+
+    manifest = REPO_ROOT / "MANIFEST.in"
+    assert manifest.is_file(), "MANIFEST.in is required to declare sdist fixtures"
+    rules = [
+        shlex.split(line, comments=True)
+        for line in manifest.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    assert ["recursive-include", "tests/data/golden", "*.json"] in rules, (
+        "MANIFEST.in must recursively include tests/data/golden/**/*.json so "
+        "paper-parity fixtures ship in the source distribution"
+    )
+    assert ["recursive-include", "docs", "*.md"] in rules
+    assert ["recursive-include", "examples", "*.md", "*.py"] in rules
+    assert (REPO_ROOT / "docs" / "preparing_audit_evidence.md").is_file()
+    assert (REPO_ROOT / "examples" / "scorer_rate_gap_diagnostic.py").is_file()
+    assert (REPO_ROOT / "examples" / "scorer_distribution_gap_diagnostic.py").is_file()
+    assert (
+        REPO_ROOT / "examples" / "scorer_counterfactual_sensitivity_diagnostic.py"
+    ).is_file()
+    assert (
+        golden_root
+        / "diagnostics"
+        / "score_counterfactual_sensitivity"
+        / "bbq_age_toxicity_v1.json"
+    ).is_file()
