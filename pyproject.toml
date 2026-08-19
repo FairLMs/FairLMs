@@ -63,9 +63,9 @@ dependencies = [
 # Keep table sections below all bare `[project]` keys — a bare key placed after a
 # `[table]` header is parsed as belonging to that table, not to [project].
 [project.urls]
-Homepage = "https://github.com/michaellarionov/JMLR_Library"
-Repository = "https://github.com/michaellarionov/JMLR_Library"
-Issues = "https://github.com/michaellarionov/JMLR_Library/issues"
+Homepage = "https://github.com/michaellarionov/fairllms"
+Repository = "https://github.com/michaellarionov/fairllms"
+Issues = "https://github.com/michaellarionov/fairllms/issues"
 
 [project.optional-dependencies]
 openai = [
