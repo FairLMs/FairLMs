@@ -1,8 +1,8 @@
-# fairllms
+# FairLMs
 
-[![PyPI](https://img.shields.io/pypi/v/fairllms)](https://pypi.org/project/fairllms/)
-[![Python](https://img.shields.io/pypi/pyversions/fairllms)](https://pypi.org/project/fairllms/)
-[![Tests](https://github.com/michaellarionov/JMLR_Library/actions/workflows/test.yml/badge.svg)](https://github.com/michaellarionov/JMLR_Library/actions/workflows/test.yml)
+[![PyPI](https://img.shields.io/pypi/v/fairlms)](https://pypi.org/project/fairlms/)
+[![Python](https://img.shields.io/pypi/pyversions/fairlms)](https://pypi.org/project/fairlms/)
+[![Tests](https://github.com/michaellarionov/FairLMs/actions/workflows/test.yml/badge.svg)](https://github.com/michaellarionov/FairLMs/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Fairness definitions and bias metrics for large language models — a companion library for studying and evaluating bias in LMs.
@@ -12,23 +12,26 @@ The long-term goal is a **stable, sklearn-style API**: import a metric, call `co
 > **Status:** All 33 metrics share one contract — configuration in the
 > constructor, data as a validated container passed to `compute(model, data)`.
 > Leaf `main.py` files and `examples/` are short public-API demos.
-> Implementation math still lives under `fairllms/definition/`.
+> Implementation math still lives under `fairlms/definition/`.
 
 ## Install
 
 ```bash
-pip install fairllms
+pip install fairlms
 ```
 
-That's all most users need — [`fairllms` is on PyPI](https://pypi.org/project/fairllms/),
+That's all most users need — [`fairlms` is on PyPI](https://pypi.org/project/fairlms/),
 so installing does not require access to this repository.
+
+The project is **FairLMs**; both the PyPI distribution and the import name are
+`fairlms`, all-lowercase per PEP 8.
 
 ### Optional extras
 
 ```bash
-pip install "fairllms[openai]"   # API-backed decoder metrics (CR, CTF, BA)
-pip install "fairllms[dev]"      # pytest
-pip install "fairllms[all]"      # openai + common extras
+pip install "fairlms[openai]"   # API-backed decoder metrics (CR, CTF, BA)
+pip install "fairlms[dev]"      # pytest
+pip install "fairlms[all]"      # openai + common extras
 ```
 
 ### From source
@@ -36,20 +39,20 @@ pip install "fairllms[all]"      # openai + common extras
 To track unreleased work, or to develop the library:
 
 ```bash
-git clone https://github.com/michaellarionov/JMLR_Library.git && cd JMLR_Library && pip install -e ".[dev]"
+git clone https://github.com/michaellarionov/FairLMs.git && cd FairLMs && pip install -e ".[dev]"
 ```
 
 An editable install means your edits take effect immediately, with no reinstall.
 You can also install a specific commit or tag directly:
 
 ```bash
-pip install "git+https://github.com/michaellarionov/JMLR_Library.git@v0.2.0"
+pip install "git+https://github.com/michaellarionov/FairLMs.git@v0.3.0"
 ```
 
 Prefer a tag over `@main` if you do this: `main` tracks unreleased work, so any
 push can change behaviour under you. Tags don't move.
 
-The import name is `fairllms` regardless of the repository name.
+The import name is `fairlms` regardless of the repository name.
 
 ### Requirements
 
@@ -65,7 +68,7 @@ respectively.
 
 Semantic versioning, currently pre-1.0 — the public API may still change between
 minor versions. The version is single-sourced in
-[`fairllms/_version.py`](fairllms/_version.py); `pyproject.toml` reads it via
+[`fairlms/_version.py`](fairlms/_version.py); `pyproject.toml` reads it via
 `[tool.setuptools.dynamic]`, so bump that one value.
 
 To cut a release, bump `_version.py`, then tag. Pushing a `v*` tag triggers
@@ -77,12 +80,13 @@ uploads to PyPI via Trusted Publishing (OIDC — no API token is stored anywhere
 git tag -a "v$(python scripts/package_version.py)" -m "Release" && git push origin --tags
 ```
 
-Users then upgrade with `pip install --upgrade fairllms`.
+Users then upgrade with `pip install --upgrade fairlms`.
 
 ### Breaking changes
 
 | Version | Change | Migration |
 |---------|--------|-----------|
+| 0.3.0 | Project renamed `fairllms` → `fairlms` | `pip install fairlms`, `import fairlms` |
 | 0.2.0 | Package renamed `fairLLMs` → `fairllms` (PEP 8) | `import fairllms` |
 | 0.2.0 | Metric config is keyword-only | `WEAT(pooling="cls")`, not `WEAT("cls")` |
 
@@ -94,9 +98,9 @@ removal in a later release, so migrate when convenient.
 ## Quick start
 
 ```python
-from fairllms.metrics import CrowSPairsScore, list_metrics
-from fairllms.datasets import CrowSPairs
-from fairllms.models import HuggingFaceModel
+from fairlms.metrics import CrowSPairsScore, list_metrics
+from fairlms.datasets import CrowSPairs
+from fairlms.models import HuggingFaceModel
 
 model = HuggingFaceModel("bert-base-uncased", task="mlm")
 result = CrowSPairsScore().compute(model, CrowSPairs(n_max=50))
@@ -117,12 +121,12 @@ Metric(**config).compute(model, data) -> MetricResult
 * **Configuration** goes in the constructor, keyword-only, and is introspectable
   via `get_params()` / `set_params()` — so metrics can be cloned or swept.
 * **Data** is the second positional argument: a `FairnessDataset`, a plain
-  sequence, or a typed container from `fairllms.metrics.data` for metrics that
+  sequence, or a typed container from `fairlms.metrics.data` for metrics that
   need several labelled sets.
 * **Unknown keywords raise `TypeError`** instead of silently using a default.
 
 ```python
-from fairllms.metrics import WEAT, SEAT, WordSets
+from fairlms.metrics import WEAT, SEAT, WordSets
 
 words = WordSets(target_1=t1, target_2=t2, attribute_1=a1, attribute_2=a2)
 WEAT(n_samples=10_000).compute(model, words)
@@ -146,7 +150,7 @@ Five metrics score predictions you already have. They also exist as plain
 functions, mirroring `sklearn.metrics`:
 
 ```python
-from fairllms.metrics import equal_opportunity_gap, accuracy_disparity
+from fairlms.metrics import equal_opportunity_gap, accuracy_disparity
 
 equal_opportunity_gap(y_true, y_pred, groups, g1="A", g2="B")   # -> float
 accuracy_disparity(scores_stereotype, scores_counter)           # -> float
@@ -169,7 +173,7 @@ The first diagnostic is axis-level representativeness (`b_rep`): smoothed
 provenance; the package does not infer a population prior from a dataset name.
 
 ```python
-from fairllms.diagnostics import (
+from fairlms.diagnostics import (
     DatasetAuditSpec,
     ReferenceDistribution,
     RepresentationEvidence,
@@ -233,7 +237,7 @@ maximum pairwise Wasserstein-1 distance in the scorer's native score units.
 inside complete, explicitly declared two-condition pairs.
 
 ```python
-from fairllms.diagnostics import (
+from fairlms.diagnostics import (
     DatasetAuditSpec,
     ScoreRateTransform,
     ScoredGroups,
@@ -292,7 +296,7 @@ Paired sensitivity uses independent evidence because group marginals do not
 preserve which rows are counterparts:
 
 ```python
-from fairllms.diagnostics import (
+from fairlms.diagnostics import (
     PairedScores,
     ScorerCounterfactualSensitivity,
 )
@@ -348,8 +352,8 @@ examples.
 Shared loaders:
 
 ```python
-from fairllms.datasets import CrowSPairs, BBQ, StereoSet
-from fairllms.models import load_masked_lm
+from fairlms.datasets import CrowSPairs, BBQ, StereoSet
+from fairlms.models import load_masked_lm
 
 crows = CrowSPairs().load()
 bbq = BBQ(categories=["Age"]).load()
@@ -359,7 +363,7 @@ loaded = load_masked_lm("bert-base-uncased")
 Leaf runners under `definition/` are short demos of the same public API:
 
 ```bash
-python -m fairllms.definition.encoder_only.intrinsic_bias.probability_based.pseudo_log_likelihood_metrics.cps.main
+python -m fairlms.definition.encoder_only.intrinsic_bias.probability_based.pseudo_log_likelihood_metrics.cps.main
 ```
 
 See also `examples/` at the repository root.
@@ -367,7 +371,7 @@ See also `examples/` at the repository root.
 ## Package layout
 
 ```
-fairllms/
+fairlms/
 ├── metrics/        # Public API: CrowSPairsScore, WEAT, … (all expose compute)
 │   ├── data.py     #   Validated input containers (WordSets, ProbeSet, …)
 │   └── functional.py #  sklearn.metrics-style functions (model-free metrics)
@@ -388,19 +392,19 @@ Every metric exposes the same method: `compute(...)`.
 
 | Class | Source | Notes |
 |-------|--------|--------|
-| `CrowSPairs` | Bundled CSV under `fairllms/data/crows_pairs/` | Stereotype / anti pairs |
+| `CrowSPairs` | Bundled CSV under `fairlms/data/crows_pairs/` | Stereotype / anti pairs |
 | `StereoSet` | Hugging Face (`stereoset` / `McGill-NLP/stereoset`) | Pairs or triples |
-| `BBQ` | Bundled jsonl under `fairllms/data/bbq/` | Optional `context_condition` filter |
+| `BBQ` | Bundled jsonl under `fairlms/data/bbq/` | Optional `context_condition` filter |
 | `BiasInBios` | Hugging Face `LabHC/bias_in_bios` | Profession / gender helpers |
 | `WinoBias` | Hugging Face `wino_bias` | Occupation direction helpers |
 | `XNLIReligionPairs` | Hugging Face XNLI + templates | Religion swap pairs |
 
-Loaders prefer canonical files in `fairllms/data/`, then fall back to legacy copies under `definition/` so existing scripts keep working.
+Loaders prefer canonical files in `fairlms/data/`, then fall back to legacy copies under `definition/` so existing scripts keep working.
 
 ## Models
 
 ```python
-from fairllms.models import (
+from fairlms.models import (
     HuggingFaceModel,
     load_masked_lm,      # task="mlm"
     load_encoder,        # task="encoder"
@@ -411,7 +415,7 @@ from fairllms.models import (
 )
 
 HuggingFaceModel("roberta-base", task="sequence_classification").load()
-OpenAIModel("davinci-002").load()  # needs OPENAI_API_KEY; pip install fairllms[openai]
+OpenAIModel("davinci-002").load()  # needs OPENAI_API_KEY; pip install fairlms[openai]
 ```
 
 Set `HF_TOKEN` (or `HUGGING_FACE_HUB_TOKEN`) for gated models such as Llama-2.
@@ -431,7 +435,7 @@ Set `HF_TOKEN` (or `HUGGING_FACE_HUB_TOKEN`) for gated models such as Llama-2.
 pip install -e ".[dev]"
 pytest                  # contract suite over every metric in the registry
 # Run a leaf metric script:
-python -m fairllms.definition.encoder_only.intrinsic_bias.similarity_based.weat.main
+python -m fairlms.definition.encoder_only.intrinsic_bias.similarity_based.weat.main
 ```
 
 `tests/test_common.py` is the analogue of scikit-learn's `check_estimator`: it
@@ -452,10 +456,10 @@ job builds the wheel, installs it into a fresh environment, and imports it from 
 directory with no source checkout on `sys.path`.
 
 That second job exists because an editable install cannot catch a whole class of
-packaging bug: `fairllms.metrics` eagerly imports every metric family, so any
-third-party module imported at module scope under `fairllms/definition/` is a
-hard requirement of `import fairllms`. If such a dependency is only listed in an
-extra, `pip install fairllms` produces a package that cannot be imported — while
+packaging bug: `fairlms.metrics` eagerly imports every metric family, so any
+third-party module imported at module scope under `fairlms/definition/` is a
+hard requirement of `import fairlms`. If such a dependency is only listed in an
+extra, `pip install fairlms` produces a package that cannot be imported — while
 every local test still passes, because the developer's environment already has
 it. [`tests/test_packaging.py`](tests/test_packaging.py) also guards this
 statically, walking the AST and naming the offending file.
@@ -467,11 +471,11 @@ Edits reach users through a tagged release, not through `main`:
 1. Edit locally — your editable install picks changes up immediately.
 2. `pytest` — the contract suite catches API breakage before it ships.
 3. Commit and push. CI verifies the matrix and the clean install.
-4. Bump [`fairllms/_version.py`](fairllms/_version.py), then tag and push the tag.
+4. Bump [`fairlms/_version.py`](fairlms/_version.py), then tag and push the tag.
 5. The publish workflow uploads to PyPI; users get it with
-   `pip install --upgrade fairllms`.
+   `pip install --upgrade fairlms`.
 
-Metric result CSVs should go under `fairllms/artifacts/` (via `fairllms.utils.results_to_csv`); leaf-local `*_results.csv` files are gitignored.
+Metric result CSVs should go under `fairlms/artifacts/` (via `fairlms.utils.results_to_csv`); leaf-local `*_results.csv` files are gitignored.
 
 ## License
 

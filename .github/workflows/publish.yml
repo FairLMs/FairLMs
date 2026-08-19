@@ -6,7 +6,7 @@ name: publish
 # the first run you must register this workflow as a trusted publisher:
 #
 #   https://pypi.org/manage/account/publishing/
-#     PyPI project name : FairLMs
+#     PyPI project name : fairlms
 #     Owner             : michaellarionov
 #     Repository name   : FairLMs
 #     Workflow name     : publish.yml

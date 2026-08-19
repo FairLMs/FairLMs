@@ -29,53 +29,53 @@ import random
 import numpy as np
 import pytest
 
-from fairllms.definition.encoder_decoder.extrinsic_bias.counterfactual_fairness.auc import (
+from fairlms.definition.encoder_decoder.extrinsic_bias.counterfactual_fairness.auc import (
     _contains_any,
     _swap_gender,
     _swap_nationality,
     compute_auc,
 )
-from fairllms.definition.encoder_decoder.extrinsic_bias.fair_inference.ibs import (
+from fairlms.definition.encoder_decoder.extrinsic_bias.fair_inference.ibs import (
     compute_ibs,
     predict_nli,
 )
-from fairllms.definition.encoder_decoder.extrinsic_bias.individual_fairness.ss import (
+from fairlms.definition.encoder_decoder.extrinsic_bias.individual_fairness.ss import (
     _get_labse_embedding,
     compute_ss,
 )
-from fairllms.definition.encoder_decoder.extrinsic_bias.individual_fairness.ss import (
+from fairlms.definition.encoder_decoder.extrinsic_bias.individual_fairness.ss import (
     _swap_gender as ss_swap_gender,
 )
-from fairllms.definition.encoder_decoder.extrinsic_bias.individual_fairness.ss import (
+from fairlms.definition.encoder_decoder.extrinsic_bias.individual_fairness.ss import (
     _swap_nationality as ss_swap_nationality,
 )
-from fairllms.definition.encoder_decoder.extrinsic_bias.position_based.npd import (
+from fairlms.definition.encoder_decoder.extrinsic_bias.position_based.npd import (
     _segment_distribution,
     _split_sentences,
     compute_npd,
 )
-from fairllms.definition.encoder_decoder.intrinsic_bias.algorithmic_disparity.lfp.lfp import (
+from fairlms.definition.encoder_decoder.intrinsic_bias.algorithmic_disparity.lfp.lfp import (
     _classify_word,
     _tokenize_words,
     compute_lfp,
 )
-from fairllms.definition.encoder_decoder.intrinsic_bias.algorithmic_disparity.mcd.mcd import (
+from fairlms.definition.encoder_decoder.intrinsic_bias.algorithmic_disparity.mcd.mcd import (
     _stem,
     compute_mcd,
 )
-from fairllms.definition.encoder_decoder.intrinsic_bias.stereotypical_association.sd.sd import (
+from fairlms.definition.encoder_decoder.intrinsic_bias.stereotypical_association.sd.sd import (
     age_accuracy,
     compute_sd,
     predict_age,
     predict_gender,
     pronoun_accuracy,
 )
-from fairllms.definition.encoder_decoder.intrinsic_bias.stereotypical_association.sva.sva import (
+from fairlms.definition.encoder_decoder.intrinsic_bias.stereotypical_association.sva.sva import (
     compute_bias_score,
     compute_stereotype_direction,
     compute_sva,
 )
-from fairllms.metrics import (
+from fairlms.metrics import (
     CounterfactualAucScore,
     InferenceBiasScore,
     LexicalFrequencyProportion,
@@ -85,7 +85,7 @@ from fairllms.metrics import (
     StereotypicalValueAttribution,
     TranslationSimilarityScore,
 )
-from fairllms.metrics.data import LabeledSentences, StereotypeLabelled, WordSets
+from fairlms.metrics.data import LabeledSentences, StereotypeLabelled, WordSets
 from tests.stubs import (
     RoundTripTokenizer,
     StubSentenceEncoder,

@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 import torch
 
-from fairllms.metrics import (
+from fairlms.metrics import (
     ConceptSpec,
     CooccurrenceAssociation,
     DemographicNextTokenProportion,

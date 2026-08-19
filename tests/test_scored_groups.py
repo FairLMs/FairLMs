@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from fairllms.diagnostics import ScoredGroups
+from fairlms.diagnostics import ScoredGroups
 
 AXIS = "unfamiliar-cohort-axis"
 GROUP_FIELD = "external__cohort_code"

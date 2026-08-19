@@ -4,7 +4,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "FairLMs"
+name = "fairlms"
 # Single-sourced from fairlms/_version.py — see [tool.setuptools.dynamic] below.
 dynamic = ["version"]
 description = "Fairness definitions and bias metrics for large language models"
@@ -47,7 +47,7 @@ dependencies = [
     "torch>=2.0",
     "transformers>=4.38",
     "datasets>=2.19",
-    # These three are imported at module scope inside FairLMs/definition/, and
+    # These three are imported at module scope inside fairlms/definition/, and
     # fairlms.metrics eagerly imports every family, so `import fairlms` fails
     # without them. They are requirements, not extras:
     #   scikit-learn -> counterfactual_auc, normalized_position_distance
@@ -74,10 +74,10 @@ openai = [
 dev = [
     "pytest>=7.0",
     "pytest-cov",
-    "FairLMs[openai]",
+    "fairlms[openai]",
 ]
 all = [
-    "FairLMs[openai,dev]",
+    "fairlms[openai,dev]",
     "accelerate>=0.30",
     "sentencepiece",
     "gender-guesser",
@@ -85,7 +85,7 @@ all = [
 ]
 
 [tool.setuptools.dynamic]
-version = { attr = "FairLMs._version.__version__" }
+version = { attr = "fairlms._version.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -97,10 +97,10 @@ filterwarnings = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["FairLMs*"]
+include = ["fairlms*"]
 
 [tool.setuptools.package-data]
-FairLMs = [
+fairlms = [
     "data/crows_pairs/*.csv",
     "data/bbq/*.jsonl",
 ]

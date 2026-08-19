@@ -4,7 +4,7 @@
 explicit reference distribution. The package can count already-labelled rows,
 but it cannot decide what a row represents or infer an axis category from raw
 text. Those decisions are part of the measurement contract and should be made
-before calling `fairllms`.
+before calling `fairlms`.
 
 This guide covers the three supported evidence paths:
 
@@ -25,7 +25,7 @@ decisions before preparing the evidence.
 |---|---|---|
 | `unit_of_analysis` | One prompt, response, conversation, sentence, person, annotation, or label membership | Every submitted record increments one count. Changing the unit changes the distribution. |
 | Axis definition | The property being counted and the meaning of every category | Category names alone rarely define the construct. |
-| `label_source` | Dataset field, human annotation protocol, external classifier, or another declared source | `fairllms` consumes labels; it does not create them or validate their substantive correctness. |
+| `label_source` | Dataset field, human annotation protocol, external classifier, or another declared source | `fairlms` consumes labels; it does not create them or validate their substantive correctness. |
 | Support | The complete set of possible categories, including any retained `unknown` category | Observed and reference support must match exactly. |
 | Multi-label policy | Collapse to one label, count memberships, or run separate binary audits | The current adapters assign one category to each submitted row. |
 | Unknown policy | Retain as a category, exclude before adaptation, or resolve by a documented rule | Missing values are not silently dropped. Exclusion changes coverage and the denominator. |
@@ -75,9 +75,9 @@ raw_documents = ["First document.", "Second document."]
 # RepresentationEvidence.from_records(raw_documents, ...)
 ```
 
-If the unit is a sentence, split the text before using `fairllms` and record the
+If the unit is a sentence, split the text before using `fairlms` and record the
 splitter and its version. If labels come from a classifier, run it before using
-`fairllms` and record the model or prompt version, thresholds, calibration,
+`fairlms` and record the model or prompt version, thresholds, calibration,
 manual-review policy, and coverage. Classification and segmentation error are
 then part of the measurement uncertainty; `b_rep` does not estimate them.
 
@@ -92,7 +92,7 @@ annotation report, or other upstream process. Include zero-count cells so the
 evidence records the complete support.
 
 ```python
-from fairllms.diagnostics import RepresentationEvidence
+from fairlms.diagnostics import RepresentationEvidence
 
 evidence = RepresentationEvidence(
     axis="source_region",
@@ -131,7 +131,7 @@ explicit field per row. Use `value_map` when raw codes differ from the canonical
 support labels.
 
 ```python
-from fairllms.diagnostics import RepresentationEvidence
+from fairlms.diagnostics import RepresentationEvidence
 
 records = [
     {"prompt_id": "p1", "region_code": "N", "text": "Example one"},
@@ -186,7 +186,7 @@ column. Other columns are ignored.
 ```python
 import pandas as pd
 
-from fairllms.diagnostics import RepresentationEvidence
+from fairlms.diagnostics import RepresentationEvidence
 
 frame = pd.DataFrame(
     {
@@ -197,7 +197,7 @@ frame = pd.DataFrame(
 )
 
 # pandas may materialize a missing value as NaN or pd.NA. Apply the declared
-# unknown policy before handing the column to fairllms.
+# unknown policy before handing the column to fairlms.
 frame["region_code"] = frame["region_code"].fillna("UNSPECIFIED")
 
 evidence = RepresentationEvidence.from_dataframe(
@@ -266,7 +266,7 @@ There is no universal unknown policy. Two common defensible choices are:
 The adapter deliberately rejects missing or unmapped values instead of silently
 dropping them. Mapping `None` to `unknown`, as shown above, is explicit retention.
 If units are excluded upstream, `RepresentationEvidence.total` and the reported
-`sample_count` describe only included units. `fairllms` cannot determine the
+`sample_count` describe only included units. `fairlms` cannot determine the
 source-universe denominator or verify the reported coverage.
 
 Pay special attention to differential missingness. A high overall coverage rate
@@ -279,7 +279,7 @@ The following script creates evidence, declares a population reference, runs the
 diagnostic, checks applicability, and serializes the full report.
 
 ```python
-from fairllms.diagnostics import (
+from fairlms.diagnostics import (
     DatasetAuditSpec,
     ReferenceDistribution,
     RepresentationEvidence,

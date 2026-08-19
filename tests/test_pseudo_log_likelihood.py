@@ -13,7 +13,7 @@ win rate is arithmetic rather than a recording of previous behaviour.
 
 import pytest
 
-from fairllms.metrics import (
+from fairlms.metrics import (
     AllUnmaskedLikelihoodAttentionScore,
     AllUnmaskedLikelihoodScore,
     ContextAssociationTestScore,

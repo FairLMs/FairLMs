@@ -1,6 +1,6 @@
 """Conformance suite: contract checks every metric in the registry must satisfy.
 
-This is the fairllms analogue of scikit-learn's ``check_estimator`` /
+This is the fairlms analogue of scikit-learn's ``check_estimator`` /
 ``parametrize_with_checks``. It is the mechanism that *keeps* the public API
 uniform as metrics are added — a new metric that forgets the parameter protocol
 fails here rather than surprising a user.
@@ -12,7 +12,7 @@ import inspect
 
 import pytest
 
-from fairllms.metrics import (
+from fairlms.metrics import (
     METRIC_REGISTRY,
     FairnessMetric,
     MetricResult,
@@ -82,7 +82,7 @@ def test_get_params_accepts_deep(name):
 
 @pytest.mark.parametrize("name", ALL_METRICS)
 def test_works_with_sklearn_clone(name):
-    """``sklearn.base.clone`` must accept fairllms metrics.
+    """``sklearn.base.clone`` must accept fairlms metrics.
 
     This is the concrete payoff of following sklearn's parameter protocol: any
     sklearn utility that clones by parameters works on these objects.
@@ -189,7 +189,7 @@ def test_declared_params_are_accepted_kwargs(name):
 def _cheap_cases():
     import numpy as np
 
-    from fairllms.metrics import GroupPredictions, ScorePair, VectorSets
+    from fairlms.metrics import GroupPredictions, ScorePair, VectorSets
 
     rng = np.random.default_rng(0)
     return {

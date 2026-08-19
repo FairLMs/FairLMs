@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from fairllms.diagnostics import (
+from fairlms.diagnostics import (
     ComponentPlan,
     DatasetAuditSpec,
     DatasetDiagnostic,

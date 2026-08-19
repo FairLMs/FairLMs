@@ -2,7 +2,7 @@
 
 import pytest
 
-from fairllms.metrics import (
+from fairlms.metrics import (
     AccuracyDisparity,
     ContextBasedDisparityScore,
     EqualOpportunityGap,

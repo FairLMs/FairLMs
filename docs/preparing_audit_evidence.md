@@ -1,7 +1,7 @@
 # Preparing audit evidence
 
 The evidence layer is the boundary between a user's source artifact and the
-validated structures that `fairllms` can audit. It is similar to data
+validated structures that `fairlms` can audit. It is similar to data
 preprocessing, but it also records the measurement decisions that give the
 numbers meaning.
 
@@ -12,7 +12,7 @@ source dataset or result table
         v
 explicit records, counts, or scored rows
         |
-        |  map named fields and validate with fairllms
+        |  map named fields and validate with fairlms
         v
 typed evidence
         |
@@ -118,7 +118,7 @@ after computation. Declare all of it:
   rule.
 
 The transform's exact operator is therefore one of `>=`, `>`, `<=`, or `<`.
-`fairllms` applies the same serialized rule to every group. It never guesses a
+`fairlms` applies the same serialized rule to every group. It never guesses a
 threshold, score direction, or equality boundary. The formal paper definition
 is `higher` with `inclusive=True` (`score >= threshold`). The paper also
 documents a lower-inclusive tail analogue; exclusive boundaries are generalized
@@ -129,7 +129,7 @@ The following complete example deliberately has equal group means but different
 event rates:
 
 ```python
-from fairllms.diagnostics import (
+from fairlms.diagnostics import (
     DatasetAuditSpec,
     ScoreRateTransform,
     ScoredGroups,
@@ -214,7 +214,7 @@ This hand-checkable example has equal group means and equal event rates under
 the rule `score >= 0.5`, yet its distributions differ:
 
 ```python
-from fairllms.diagnostics import (
+from fairlms.diagnostics import (
     DatasetAuditSpec,
     ScoredGroups,
     ScorerWasserstein1Gap,
@@ -294,7 +294,7 @@ Unknown conditions, duplicate roles, incomplete pairs, non-finite scores, and
 out-of-range scores are evidence errors rather than zero sensitivity.
 
 ```python
-from fairllms.diagnostics import (
+from fairlms.diagnostics import (
     DatasetAuditSpec,
     PairedScores,
     ScorerCounterfactualSensitivity,
@@ -407,7 +407,7 @@ Neither group means nor W1 can recover which pairing was intended.
 ## Raw-text example
 
 Suppose the source is one document containing many sentences and the intended
-unit is a sentence. `fairllms` will not split or classify that document. An
+unit is a sentence. `fairlms` will not split or classify that document. An
 upstream process must produce rows such as:
 
 ```python

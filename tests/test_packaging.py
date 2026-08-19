@@ -1,9 +1,9 @@
 """Packaging guards.
 
-`fairllms.metrics` eagerly imports every metric family, so any third-party
-module imported at module scope under `fairllms/definition/` becomes a hard
-requirement of `import fairllms`. A dependency that is only listed in an extra
-therefore breaks a plain `pip install fairllms` — which is exactly what happened
+`fairlms.metrics` eagerly imports every metric family, so any third-party
+module imported at module scope under `fairlms/definition/` becomes a hard
+requirement of `import fairlms`. A dependency that is only listed in an extra
+therefore breaks a plain `pip install fairlms` — which is exactly what happened
 with `wordfreq`, `nltk` and `scikit-learn` before 0.2.0.
 
 This test catches that class of bug from the source tree, without needing a
@@ -20,7 +20,7 @@ import sys
 import pytest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-PACKAGE = REPO_ROOT / "fairllms"
+PACKAGE = REPO_ROOT / "fairlms"
 
 # import name -> distribution name, where they differ
 DIST_NAME = {
@@ -74,7 +74,7 @@ def _module_level_third_party_imports() -> dict[str, set[str]]:
             else:
                 continue
             for name in names:
-                if name == "fairllms" or name in sys.stdlib_module_names:
+                if name == "fairlms" or name in sys.stdlib_module_names:
                     continue
                 found.setdefault(name, set()).add(str(path.relative_to(REPO_ROOT)))
     return found
@@ -91,7 +91,7 @@ def test_module_level_imports_are_declared_core_dependencies():
 
     assert not offenders, (
         "These are imported at module scope but are not core dependencies, so "
-        "`import fairllms` fails on a clean install:\n"
+        "`import fairlms` fails on a clean install:\n"
         + "\n".join(
             f"  {dist}\n" + "\n".join(f"    {f}" for f in files)
             for dist, files in sorted(offenders.items())
@@ -102,31 +102,31 @@ def test_module_level_imports_are_declared_core_dependencies():
 
 
 def test_version_is_single_sourced():
-    """pyproject must read the version from fairllms/_version.py, not duplicate it."""
+    """pyproject must read the version from fairlms/_version.py, not duplicate it."""
     tomllib = pytest.importorskip("tomllib")
     with open(REPO_ROOT / "pyproject.toml", "rb") as fh:
         cfg = tomllib.load(fh)
     project = cfg["project"]
     assert "version" not in project, (
         "version is hardcoded in pyproject.toml; it must stay dynamic so "
-        "fairllms/_version.py is the single source of truth"
+        "fairlms/_version.py is the single source of truth"
     )
     assert "version" in project.get("dynamic", [])
     attr = cfg["tool"]["setuptools"]["dynamic"]["version"]["attr"]
-    assert attr == "fairllms._version.__version__"
+    assert attr == "fairlms._version.__version__"
 
 
 def test_runtime_version_matches_version_module():
-    import fairllms
-    from fairllms import _version
+    import fairlms
+    from fairlms import _version
 
-    assert fairllms.__version__ == _version.__version__
+    assert fairlms.__version__ == _version.__version__
 
 
 def test_version_helper_script_agrees_with_package():
     """scripts/package_version.py is what the release workflow tags against.
 
-    It must return the real version without importing fairllms. A regression here
+    It must return the real version without importing fairlms. A regression here
     means a release could be tagged with a version that isn't the package's.
     """
     import subprocess
@@ -137,7 +137,7 @@ def test_version_helper_script_agrees_with_package():
         text=True,
         check=True,
     )
-    from fairllms import _version
+    from fairlms import _version
 
     assert result.stdout.strip() == _version.__version__
 

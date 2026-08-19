@@ -17,11 +17,11 @@ import numpy as np
 import pytest
 import torch
 
-from fairllms.definition.encoder_only.intrinsic_bias.probability_based.masked_token_metrics.disco.disco import (  # noqa: E501
+from fairlms.definition.encoder_only.intrinsic_bias.probability_based.masked_token_metrics.disco.disco import (  # noqa: E501
     compute_disco_multi_k,
     get_ranked_predictions,
 )
-from fairllms.metrics import (
+from fairlms.metrics import (
     ContrastBasedScore,
     ContrastSpec,
     DiscoveryOfCorrelationsScore,

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Print the package version from fairllms/_version.py.
+"""Print the package version from fairlms/_version.py.
 
-Reads the assignment via AST so it works without importing fairllms (which pulls
+Reads the assignment via AST so it works without importing fairlms (which pulls
 in torch). Used by the release workflow to check that a tag matches the version,
 and useful locally:
 
@@ -17,7 +17,7 @@ import ast
 import pathlib
 import sys
 
-VERSION_FILE = pathlib.Path(__file__).resolve().parent.parent / "fairllms" / "_version.py"
+VERSION_FILE = pathlib.Path(__file__).resolve().parent.parent / "fairlms" / "_version.py"
 
 
 def package_version(path: pathlib.Path = VERSION_FILE) -> str:

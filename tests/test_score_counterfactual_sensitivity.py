@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from fairllms.diagnostics import (
+from fairlms.diagnostics import (
     DIAGNOSTIC_REGISTRY,
     DatasetAuditSpec,
     DiagnosticStatus,

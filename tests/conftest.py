@@ -23,7 +23,7 @@ from tests.stubs import (
 
 
 def _try_load(task):
-    from fairllms.models import HuggingFaceModel
+    from fairlms.models import HuggingFaceModel
 
     try:
         adapter = HuggingFaceModel("bert-base-uncased", task=task)
@@ -41,7 +41,7 @@ def encoder_model():
 
 @pytest.fixture
 def word_sets():
-    from fairllms.metrics import WordSets
+    from fairlms.metrics import WordSets
 
     return WordSets(
         target_1=["Adam", "Chip", "Harry", "Josh"],
@@ -53,7 +53,7 @@ def word_sets():
 
 @pytest.fixture
 def context_sets():
-    from fairllms.metrics import ContextSets
+    from fairlms.metrics import ContextSets
 
     return ContextSets(
         target_1={"Adam": ["Adam went home.", "Adam is here."]},
@@ -67,7 +67,7 @@ def context_sets():
 def vector_sets():
     import numpy as np
 
-    from fairllms.metrics import VectorSets
+    from fairlms.metrics import VectorSets
 
     rng = np.random.default_rng(0)
     return VectorSets(*(rng.normal(size=(4, 16)) for _ in range(4)))

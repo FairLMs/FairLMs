@@ -9,7 +9,7 @@ from fractions import Fraction
 import pandas as pd
 import pytest
 
-from fairllms.diagnostics import (
+from fairlms.diagnostics import (
     ReferenceDistribution,
     ReferencePurpose,
     RepresentationEvidence,

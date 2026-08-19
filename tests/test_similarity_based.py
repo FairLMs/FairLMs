@@ -13,7 +13,7 @@ import warnings
 import numpy as np
 import pytest
 
-from fairllms.metrics import CEAT, SEAT, WEAT, ContextSets, VectorSets, WordSets
+from fairlms.metrics import CEAT, SEAT, WEAT, ContextSets, VectorSets, WordSets
 
 TERMS = (
     ["Adam", "Chip", "Harry", "Josh"],

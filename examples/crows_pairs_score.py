@@ -1,8 +1,8 @@
-"""CrowS-Pairs Score via the public fairllms API."""
+"""CrowS-Pairs Score via the public fairlms API."""
 
-from fairllms.datasets import CrowSPairs
-from fairllms.metrics import CrowSPairsScore
-from fairllms.models import HuggingFaceModel
+from fairlms.datasets import CrowSPairs
+from fairlms.metrics import CrowSPairsScore
+from fairlms.models import HuggingFaceModel
 
 
 def main():

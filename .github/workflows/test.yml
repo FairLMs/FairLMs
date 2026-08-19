@@ -41,7 +41,7 @@ jobs:
           python -c "import fairlms; print('version:', fairlms.__version__)"
           python -c "
           import importlib.metadata as m, fairlms
-          dist, run = m.version('FairLMs'), fairlms.__version__
+          dist, run = m.version('fairlms'), fairlms.__version__
           assert dist == run, f'version drift: dist={dist} runtime={run}'
           print('version single-sourcing OK:', dist)
           "

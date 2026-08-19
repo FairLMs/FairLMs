@@ -1,12 +1,12 @@
-"""WEAT via the public fairllms API (one Caliskan-style test).
+"""WEAT via the public fairlms API (one Caliskan-style test).
 
 Shows the preferred shape: configuration in the constructor, data as a
 validated container passed positionally to ``compute``.
 """
 
-from fairllms.definition.encoder_only.intrinsic_bias.similarity_based.weat.data import C1
-from fairllms.metrics import WEAT, WordSets
-from fairllms.models import HuggingFaceModel
+from fairlms.definition.encoder_only.intrinsic_bias.similarity_based.weat.data import C1
+from fairlms.metrics import WEAT, WordSets
+from fairlms.models import HuggingFaceModel
 
 
 def main():

@@ -1,6 +1,6 @@
 """Paired scorer sensitivity for an unfamiliar result-table schema."""
 
-from fairllms.diagnostics import (
+from fairlms.diagnostics import (
     DatasetAuditSpec,
     PairedScores,
     ScorerCounterfactualSensitivity,
