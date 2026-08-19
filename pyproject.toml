@@ -74,6 +74,7 @@ openai = [
 dev = [
     "pytest>=7.0",
     "pytest-cov",
+    "fairllms[openai]",
 ]
 all = [
     "fairllms[openai,dev]",
