@@ -6,9 +6,9 @@ name: publish
 # the first run you must register this workflow as a trusted publisher:
 #
 #   https://pypi.org/manage/account/publishing/
-#     PyPI project name : fairllms
+#     PyPI project name : FairLMs
 #     Owner             : michaellarionov
-#     Repository name   : fairllms
+#     Repository name   : FairLMs
 #     Workflow name     : publish.yml
 #     Environment name  : pypi
 #
@@ -50,7 +50,7 @@ jobs:
       - name: Check distributions
         run: python -m twine check --strict dist/*
 
-      # Guards against the tag disagreeing with fairllms/_version.py, which
+      # Guards against the tag disagreeing with fairlms/_version.py, which
       # would publish a version nobody can reproduce from the tag.
       #
       # Reads the value via AST rather than a regex: _version.py has a docstring,

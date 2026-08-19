@@ -4,8 +4,8 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fairllms"
-# Single-sourced from fairllms/_version.py — see [tool.setuptools.dynamic] below.
+name = "FairLMs"
+# Single-sourced from fairlms/_version.py — see [tool.setuptools.dynamic] below.
 dynamic = ["version"]
 description = "Fairness definitions and bias metrics for large language models"
 readme = "README.md"
@@ -47,8 +47,8 @@ dependencies = [
     "torch>=2.0",
     "transformers>=4.38",
     "datasets>=2.19",
-    # These three are imported at module scope inside fairllms/definition/, and
-    # fairllms.metrics eagerly imports every family, so `import fairllms` fails
+    # These three are imported at module scope inside FairLMs/definition/, and
+    # fairlms.metrics eagerly imports every family, so `import fairlms` fails
     # without them. They are requirements, not extras:
     #   scikit-learn -> counterfactual_auc, normalized_position_distance
     #   wordfreq     -> lexical_frequency_proportion
@@ -63,9 +63,9 @@ dependencies = [
 # Keep table sections below all bare `[project]` keys — a bare key placed after a
 # `[table]` header is parsed as belonging to that table, not to [project].
 [project.urls]
-Homepage = "https://github.com/michaellarionov/fairllms"
-Repository = "https://github.com/michaellarionov/fairllms"
-Issues = "https://github.com/michaellarionov/fairllms/issues"
+Homepage = "https://github.com/michaellarionov/FairLMs"
+Repository = "https://github.com/michaellarionov/FairLMs"
+Issues = "https://github.com/michaellarionov/FairLMs/issues"
 
 [project.optional-dependencies]
 openai = [
@@ -74,10 +74,10 @@ openai = [
 dev = [
     "pytest>=7.0",
     "pytest-cov",
-    "fairllms[openai]",
+    "FairLMs[openai]",
 ]
 all = [
-    "fairllms[openai,dev]",
+    "FairLMs[openai,dev]",
     "accelerate>=0.30",
     "sentencepiece",
     "gender-guesser",
@@ -85,7 +85,7 @@ all = [
 ]
 
 [tool.setuptools.dynamic]
-version = { attr = "fairllms._version.__version__" }
+version = { attr = "FairLMs._version.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -97,10 +97,10 @@ filterwarnings = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["fairllms*"]
+include = ["FairLMs*"]
 
 [tool.setuptools.package-data]
-fairllms = [
+FairLMs = [
     "data/crows_pairs/*.csv",
     "data/bbq/*.jsonl",
 ]

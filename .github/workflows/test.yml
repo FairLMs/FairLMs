@@ -35,13 +35,13 @@ jobs:
         run: pip install -e ".[dev]"
 
       # Catches packaging breakage and version drift between
-      # fairllms/_version.py and the built distribution metadata.
+      # fairlms/_version.py and the built distribution metadata.
       - name: Check import and version
         run: |
-          python -c "import fairllms; print('version:', fairllms.__version__)"
+          python -c "import fairlms; print('version:', fairlms.__version__)"
           python -c "
-          import importlib.metadata as m, fairllms
-          dist, run = m.version('fairllms'), fairllms.__version__
+          import importlib.metadata as m, fairlms
+          dist, run = m.version('FairLMs'), fairlms.__version__
           assert dist == run, f'version drift: dist={dist} runtime={run}'
           print('version single-sourcing OK:', dist)
           "
@@ -50,7 +50,7 @@ jobs:
       # no model weights, and the model-backed tests skip cleanly without them.
       #
       # Note this job also guards the package rename. ubuntu is case-sensitive,
-      # so any leftover `import fairLLMs` fails here even though macOS would
+      # so any leftover `import FairLMs` fails here even though macOS would
       # silently accept it.
       - name: Run tests
         env:
@@ -85,11 +85,11 @@ jobs:
           pip install dist/*.whl
           cd "$(mktemp -d)"
           python -c "
-          import fairllms
-          from fairllms.metrics import list_metrics, equal_opportunity_gap
-          from fairllms.datasets import CrowSPairs
+          import fairlms
+          from fairlms.metrics import list_metrics, equal_opportunity_gap
+          from fairlms.datasets import CrowSPairs
           assert len(list_metrics()) == 33, list_metrics()
           assert len(CrowSPairs(n_max=5).load()) == 5   # bundled data ships
           equal_opportunity_gap([1, 1, 0], [1, 0, 0], ['A', 'B', 'A'], g1='A', g2='B')
-          print('clean install OK, version', fairllms.__version__)
+          print('clean install OK, version', fairlms.__version__)
           "
