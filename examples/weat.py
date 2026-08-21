@@ -4,22 +4,15 @@ Shows the preferred shape: configuration in the constructor, data as a
 validated container passed positionally to ``compute``.
 """
 
-from fairlms.definition.encoder_only.intrinsic_bias.similarity_based.weat.data import C1
-from fairlms.metrics import WEAT, WordSets
+from fairlms.data import weat_c1
+from fairlms.metrics import WEAT
 from fairlms.models import HuggingFaceModel
 
 
 def main():
     model = HuggingFaceModel("bert-base-uncased", task="encoder")
 
-    words = WordSets(
-        target_1=C1["t1"][:8],
-        target_2=C1["t2"][:8],
-        attribute_1=C1["a1"][:8],
-        attribute_2=C1["a2"][:8],
-    )
-
-    result = WEAT(pooling="mean", n_samples=10_000).compute(model, words)
+    result = WEAT(pooling="mean", n_samples=10_000).compute(model, weat_c1)
 
     print(result)
     print(f"score={result.score}")

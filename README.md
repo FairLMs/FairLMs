@@ -46,7 +46,7 @@ An editable install means your edits take effect immediately, with no reinstall.
 You can also install a specific commit or tag directly:
 
 ```bash
-pip install "git+https://github.com/michaellarionov/FairLMs.git@v0.3.0"
+pip install "git+https://github.com/michaellarionov/FairLMs.git@v0.3.1"
 ```
 
 Prefer a tag over `@main` if you do this: `main` tracks unreleased work, so any
@@ -133,6 +133,32 @@ WEAT(n_samples=10_000).compute(model, words)
 SEAT(pooling="cls").compute(model, words)      # same data, different metric
 
 WEAT(pooling="cls").get_params()               # {'n_samples': 10000, 'pooling': 'cls'}
+```
+
+The published association tests ship pre-wrapped in `fairlms.data`, so a
+standard run needs no term lists at all — and swapping the checkpoint does not
+change the call:
+
+```python
+from fairlms.data import weat_c1, list_word_sets
+from fairlms.metrics import SEAT
+from fairlms.models import HuggingFaceModel
+
+metric = SEAT(n_samples=1_000)
+for ckpt in ("bert-base-uncased", "roberta-base"):
+    result = metric.compute(HuggingFaceModel(ckpt, task="encoder"), weat_c1)
+    print(ckpt, result.score, result.details["p_value"])
+
+list_word_sets()   # ['weat_c1', …, 'seat_c1', …]
+```
+
+`weat_c1` *is* a `WordSets`, so user-supplied evidence goes through the exact
+same call with no adapter code:
+
+```python
+mine = WordSets(target_1=names_a, target_2=names_b,
+                attribute_1=pleasant, attribute_2=unpleasant)
+metric.compute(model, mine)
 ```
 
 Containers validate at construction, so mistakes fail immediately:
@@ -379,7 +405,7 @@ fairlms/
 ├── datasets/       # CrowSPairs, StereoSet, BBQ, BiasInBios, WinoBias, …
 ├── models/         # HuggingFaceModel, OpenAIModel, load_* helpers
 ├── utils/          # PLL / masking / association / path helpers
-├── data/           # Bundled CrowS-Pairs + BBQ files
+├── data/           # Bundled CrowS-Pairs + BBQ files; exports WEAT/SEAT word sets
 ├── artifacts/      # Preferred output dir for metric CSVs
 └── definition/     # Internal implementations + short public-API demos (main.py)
 ```
@@ -400,6 +426,29 @@ Every metric exposes the same method: `compute(...)`.
 | `XNLIReligionPairs` | Hugging Face XNLI + templates | Religion swap pairs |
 
 Loaders prefer canonical files in `fairlms/data/`, then fall back to legacy copies under `definition/` so existing scripts keep working.
+
+### Bundled word sets
+
+Association tests need four labelled term lists rather than a corpus, so they
+are importable constants instead of loader classes. Each one is an
+already-validated `WordSets`, ready to pass straight to `compute`:
+
+| Name | Test | Terms |
+|------|------|-------|
+| `weat_c1` … `weat_c4` | Caliskan et al. (2017) C1–C4 | Race, gender, disease, age |
+| `seat_c1` … `seat_c4` | May et al. (2019), expanded name lists | Same four axes |
+
+```python
+from fairlms.data import weat_c2, get_word_set, WORD_SET_LABELS
+
+get_word_set("seat_c1")                # same objects, by name
+WORD_SET_LABELS["weat_c2"]             # 'C2 – Gender (Male/Female names × Career/Family)'
+```
+
+Both families work with `WEAT` and `SEAT`; the `seat_*` lists are the larger
+name sets the sentence templates were sized for. All eight have balanced target
+lists, which `SEAT` requires. CEAT is not included — it consumes `ContextSets`
+(terms keyed to context sentences), not four flat lists.
 
 ## Models
 

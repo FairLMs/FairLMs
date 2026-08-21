@@ -100,7 +100,11 @@ where = ["."]
 include = ["fairlms*"]
 
 [tool.setuptools.package-data]
-fairlms = [
-    "data/crows_pairs/*.csv",
-    "data/bbq/*.jsonl",
+# fairlms/data/ has an __init__.py (it exports the bundled WEAT/SEAT word sets),
+# so it is a package in its own right and owns these files. Keyed on
+# `fairlms.data` for that reason. The older `fairlms = ["data/bbq/*.jsonl"]`
+# form still resolves on setuptools>=77, so this is correctness, not a fix.
+"fairlms.data" = [
+    "crows_pairs/*.csv",
+    "bbq/*.jsonl",
 ]
