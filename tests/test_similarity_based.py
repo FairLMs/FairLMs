@@ -113,6 +113,108 @@ class TestConfigIsHonoured:
 
 
 # --------------------------------------------------------------------------
+# Reproducibility is declared config, not a global side effect
+#
+# WEAT/SEAT p-values are sampled, but until `seed` existed the only way to pin
+# one was `np.random.seed(...)` at the call site: reproducibility via mutation
+# of interpreter-wide state, invisible to `get_params()`, and shared with every
+# other consumer of the global RNG. CEAT already took a `seed`; these tests hold
+# its two siblings to the same contract.
+#
+# `n_samples` is kept below C(2n, n) throughout — 70 for the four-term sets —
+# so the sampled branch runs. Above that threshold the p-value is computed by
+# exact enumeration and no seed could matter.
+# --------------------------------------------------------------------------
+class TestSeedIsDeclaredConfig:
+    @pytest.mark.parametrize("metric_cls", [WEAT, SEAT])
+    def test_seed_is_introspectable_config(self, metric_cls):
+        """The claim the paper makes about keyword-only config, for `seed`."""
+        metric = metric_cls(n_samples=20, seed=0)
+        assert metric.get_params()["seed"] == 0
+        # Reconstructible from its own params, so sklearn.clone works.
+        assert type(metric)(**metric.get_params()).get_params() == metric.get_params()
+
+    def test_seed_rejected_positionally(self):
+        """Config stays keyword-only; a bare 0 must not land in `seed`."""
+        with pytest.raises(TypeError):
+            SEAT(0)  # noqa: B018
+
+    def test_weat_seed_makes_runs_reproducible(self, vector_sets):
+        kw = dict(n_samples=20, seed=7)
+        a = WEAT(**kw).compute(None, vector_sets).details["p_value"]
+        b = WEAT(**kw).compute(None, vector_sets).details["p_value"]
+        assert a == b
+
+    def test_seat_seed_makes_runs_reproducible(self, encoder_model):
+        kw = dict(n_samples=50, seed=7)
+        ws = WordSets(*TERMS)
+        a = SEAT(**kw).compute(encoder_model, ws).details["p_value"]
+        b = SEAT(**kw).compute(encoder_model, ws).details["p_value"]
+        assert a == b
+
+    @pytest.mark.parametrize("metric_cls", [WEAT, SEAT])
+    def test_seed_is_reported_in_details(self, metric_cls, vector_sets, encoder_model):
+        """A result must carry the seed that produced it, or it is not evidence."""
+        if metric_cls is WEAT:
+            result = WEAT(n_samples=20, seed=3).compute(None, vector_sets)
+        else:
+            result = SEAT(n_samples=50, seed=3).compute(
+                encoder_model, WordSets(*TERMS)
+            )
+        assert result.details["seed"] == 3
+
+    def test_seeded_result_ignores_global_numpy_state(self, vector_sets):
+        """Seeding numpy globally must not be able to change a seeded result."""
+        import numpy as np
+
+        np.random.seed(1)
+        a = WEAT(n_samples=20, seed=5).compute(None, vector_sets).details["p_value"]
+        np.random.seed(999)
+        b = WEAT(n_samples=20, seed=5).compute(None, vector_sets).details["p_value"]
+        assert a == b
+
+    def test_compute_does_not_disturb_the_global_rng(self, vector_sets):
+        """The metric must not consume global entropy others are relying on."""
+        import numpy as np
+
+        np.random.seed(0)
+        expected = np.random.random(3).tolist()
+
+        np.random.seed(0)
+        WEAT(n_samples=20, seed=5).compute(None, vector_sets)
+        after = np.random.random(3).tolist()
+
+        assert after == expected
+
+    def test_different_seeds_sample_different_permutations(self):
+        """Otherwise `seed` would be accepted and silently ignored."""
+        import numpy as np
+
+        from fairlms.utils import permutation_pval
+
+        rng = np.random.default_rng(42)
+        s_t1 = rng.normal(1.0, size=12)
+        s_t2 = rng.normal(0.0, size=12)
+        seen = {
+            permutation_pval(s_t1, s_t2, n_samples=200, seed=seed)
+            for seed in range(8)
+        }
+        assert len(seen) > 1
+
+    def test_exact_branch_is_seed_invariant(self):
+        """C(2n, n) <= n_samples enumerates every partition; the seed is moot."""
+        from fairlms.utils import permutation_pval
+
+        s_t1 = [3.0, 2.0, 1.0, 0.0]
+        s_t2 = [0.0, 1.0, 2.0, 3.0]
+        seen = {
+            permutation_pval(s_t1, s_t2, n_samples=10_000, seed=seed)
+            for seed in range(5)
+        }
+        assert len(seen) == 1
+
+
+# --------------------------------------------------------------------------
 # Argument handling
 # --------------------------------------------------------------------------
 class TestArgumentHandling:

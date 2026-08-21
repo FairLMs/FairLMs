@@ -124,6 +124,10 @@ class WEAT(FairnessMetric):
         :class:`~fairlms.metrics.data.VectorSets`.
     n_samples:
         Permutation samples for the p-value.
+    seed:
+        Seed for the permutation test, making the p-value reproducible without
+        mutating numpy's global RNG. ``None`` draws from OS entropy. Has no
+        effect when the term sets are small enough for exact enumeration.
 
     Examples
     --------
@@ -140,9 +144,16 @@ class WEAT(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
 
-    def __init__(self, *, pooling: str = "mean", n_samples: int = 10_000):
+    def __init__(
+        self,
+        *,
+        pooling: str = "mean",
+        n_samples: int = 10_000,
+        seed: Optional[int] = None,
+    ):
         self.pooling = pooling
         self.n_samples = n_samples
+        self.seed = seed
 
     def _embed(self, hf_model, tokenizer, terms, device, pooling) -> np.ndarray:
         return np.asarray(
@@ -184,9 +195,10 @@ class WEAT(FairnessMetric):
                     "second argument."
                 )
 
-        self._reject_unknown_kwargs(legacy, "n_samples", "pooling")
+        self._reject_unknown_kwargs(legacy, "n_samples", "pooling", "seed")
         n_samples = legacy.get("n_samples", self.n_samples)
         pooling = legacy.get("pooling", self.pooling)
+        seed = legacy.get("seed", self.seed)
 
         if isinstance(data, Mapping):
             data = _from_mapping(data, WordSets)
@@ -217,7 +229,7 @@ class WEAT(FairnessMetric):
                 f"data, got {type(data).__name__}."
             )
 
-        d, p = compute_weat(T1, T2, A, B, n_samples=n_samples)
+        d, p = compute_weat(T1, T2, A, B, n_samples=n_samples, seed=seed)
         return MetricResult(
             score=float(d),
             details={
@@ -226,6 +238,7 @@ class WEAT(FairnessMetric):
                 "n_targets": (len(T1), len(T2)),
                 "n_attributes": (len(A), len(B)),
                 "n_samples": n_samples,
+                "seed": seed,
                 "pooling": pooling if embedded_with else None,
                 "embedded_with": embedded_with,
             },
@@ -247,6 +260,15 @@ class SEAT(FairnessMetric):
     templates:
         Sentence templates containing one ``{}`` slot. ``None`` uses the
         built-in neutral set.
+    seed:
+        Seed for the permutation test, making the p-value reproducible without
+        mutating numpy's global RNG. ``None`` draws from OS entropy. Has no
+        effect when the term sets are small enough for exact enumeration.
+
+    Examples
+    --------
+    >>> SEAT(n_samples=1_000, seed=0).get_params()               # doctest: +SKIP
+    {'n_samples': 1000, 'pooling': 'mean', 'seed': 0, 'templates': None}
     """
 
     name = "seat"
@@ -259,10 +281,12 @@ class SEAT(FairnessMetric):
         pooling: str = "mean",
         n_samples: int = 10_000,
         templates: Optional[Sequence[str]] = None,
+        seed: Optional[int] = None,
     ):
         self.pooling = pooling
         self.n_samples = n_samples
         self.templates = templates
+        self.seed = seed
 
     def compute(
         self,
@@ -285,10 +309,13 @@ class SEAT(FairnessMetric):
             data = WordSets(**terms)
             legacy = {k: v for k, v in legacy.items() if k not in used}
 
-        self._reject_unknown_kwargs(legacy, "n_samples", "pooling", "templates")
+        self._reject_unknown_kwargs(
+            legacy, "n_samples", "pooling", "templates", "seed"
+        )
         n_samples = legacy.get("n_samples", self.n_samples)
         pooling = legacy.get("pooling", self.pooling)
         templates = legacy.get("templates", self.templates)
+        seed = legacy.get("seed", self.seed)
 
         if isinstance(data, Mapping):
             data = _from_mapping(data, WordSets)
@@ -314,6 +341,7 @@ class SEAT(FairnessMetric):
             pooling=pooling,
             n_samples=n_samples,
             device=device,
+            seed=seed,
         )
         return MetricResult(
             score=float(effect),
@@ -323,6 +351,7 @@ class SEAT(FairnessMetric):
                 "n_templates": len(templates) if templates is not None else None,
                 "pooling": pooling,
                 "n_samples": n_samples,
+                "seed": seed,
             },
         )
 

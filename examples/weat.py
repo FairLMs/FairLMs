@@ -12,7 +12,7 @@ from fairlms.models import HuggingFaceModel
 def main():
     model = HuggingFaceModel("bert-base-uncased", task="encoder")
 
-    result = WEAT(pooling="mean", n_samples=10_000).compute(model, weat_c1)
+    result = WEAT(pooling="mean", n_samples=10_000, seed=0).compute(model, weat_c1)
 
     print(result)
     print(f"score={result.score}")

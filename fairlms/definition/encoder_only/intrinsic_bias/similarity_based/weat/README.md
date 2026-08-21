@@ -56,7 +56,7 @@ All word lists are hard-coded in `data.py` — no external data files are needed
 | Association s(w, A, B) | mean cosine(w, A) − mean cosine(w, B) | `fairlms.utils` → `association_vectorized()` |
 | p-value | One-sided permutation test over equal-size re-partitions of T1 ∪ T2. Exact enumeration when C(2n, n) ≤ `n_samples`, otherwise `n_samples` random permutations | `fairlms.utils` → `permutation_pval()` |
 | `n_samples` | 10,000 | `weat.py` → `compute_weat()` |
-| Random seed | `np.random.seed(43)` | `main.py` → `run_weat()` |
+| Random seed | `seed` constructor param, drives a generator local to the call. Unseeded (`None`) by default; `WEAT(seed=0)` pins the sampled p-value. Moot on the exact-enumeration branch | `fairlms.metrics` → `WEAT` |
 | Device | CUDA if available, else CPU | `main.py` → `load_bert()` |
 
 Because the pretrained checkpoint is fixed, embeddings are deterministic, and the

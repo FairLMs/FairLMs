@@ -7,4 +7,4 @@ Kept free of imports so the build backend can read ``__version__`` statically
 Bump this one value; ``pyproject.toml`` and ``fairlms.__version__`` follow.
 """
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"

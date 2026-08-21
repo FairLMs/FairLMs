@@ -46,7 +46,7 @@ An editable install means your edits take effect immediately, with no reinstall.
 You can also install a specific commit or tag directly:
 
 ```bash
-pip install "git+https://github.com/michaellarionov/FairLMs.git@v0.3.1"
+pip install "git+https://github.com/michaellarionov/FairLMs.git@v0.4.0"
 ```
 
 Prefer a tag over `@main` if you do this: `main` tracks unreleased work, so any
@@ -86,6 +86,7 @@ Users then upgrade with `pip install --upgrade fairlms`.
 
 | Version | Change | Migration |
 |---------|--------|-----------|
+| 0.4.0 | WEAT/SEAT sample permutations from a call-local generator, so `np.random.seed(...)` no longer pins their p-values | Pass the seed as config: `WEAT(seed=0)`, `SEAT(seed=0)`. Seeded p-values differ from pre-0.4.0 values for the same nominal seed (PCG64 vs Mersenne Twister); effect sizes are unaffected |
 | 0.3.0 | Project renamed `fairllms` → `fairlms` | `pip install fairlms`, `import fairlms` |
 | 0.2.0 | Package renamed `fairLLMs` → `fairllms` (PEP 8) | `import fairllms` |
 | 0.2.0 | Metric config is keyword-only | `WEAT(pooling="cls")`, not `WEAT("cls")` |
@@ -144,12 +145,21 @@ from fairlms.data import weat_c1, list_word_sets
 from fairlms.metrics import SEAT
 from fairlms.models import HuggingFaceModel
 
-metric = SEAT(n_samples=1_000)
+metric = SEAT(n_samples=1_000, seed=0)
 for ckpt in ("bert-base-uncased", "roberta-base"):
     result = metric.compute(HuggingFaceModel(ckpt, task="encoder"), weat_c1)
     print(ckpt, result.score, result.details["p_value"])
 
 list_word_sets()   # ['weat_c1', …, 'seat_c1', …]
+```
+
+`seed` is ordinary constructor config, so a reported p-value is reproducible
+from the metric's own parameters — no `np.random.seed` at the call site, and
+nothing about the run recorded outside `get_params()`:
+
+```python
+SEAT(n_samples=1_000, seed=0).get_params()
+# {'n_samples': 1000, 'pooling': 'mean', 'seed': 0, 'templates': None}
 ```
 
 `weat_c1` *is* a `WordSets`, so user-supplied evidence goes through the exact

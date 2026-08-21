@@ -21,7 +21,8 @@ def apply_templates(terms, templates = None):
 
 
 def compute_seat(model, tokenizer, T1_terms, T2_terms, A1_terms, A2_terms,
-    templates= None, pooling = "mean", n_samples = 10_000, device = None):
+    templates= None, pooling = "mean", n_samples = 10_000, device = None,
+    seed = None):
     if len(T1_terms) != len(T2_terms):
         raise ValueError(
             f"T1 and T2 must have the same number of terms, "
@@ -60,6 +61,6 @@ def compute_seat(model, tokenizer, T1_terms, T2_terms, A1_terms, A2_terms,
     s_T2 = np.array([association_vectorized(t, A1_vecs, A2_vecs) for t in T2_vecs])
 
     effect_size = cohens_d(s_T1, s_T2)
-    p_value = permutation_pval(s_T1, s_T2, n_samples)
+    p_value = permutation_pval(s_T1, s_T2, n_samples, seed=seed)
 
     return effect_size, p_value

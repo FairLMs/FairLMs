@@ -37,7 +37,21 @@ def cohens_d(s_T1, s_T2):
     return (np.mean(s_T1) - np.mean(s_T2)) / np.std(all_s, ddof=1)
 
 
-def permutation_pval(s_T1, s_T2, n_samples=10_000):
+def permutation_pval(s_T1, s_T2, n_samples=10_000, seed=None):
+    """One-sided permutation p-value over equal-size re-partitions of T1 ∪ T2.
+
+    Exact enumeration when ``C(2n, n) <= n_samples``, otherwise ``n_samples``
+    sampled permutations.
+
+    Parameters
+    ----------
+    seed:
+        Seed for the sampled branch. Drives a generator local to this call, so
+        the result depends on nothing but the arguments — callers do not have to
+        reach for ``np.random.seed``, and one metric's sampling cannot be
+        perturbed by unrelated global state. ``None`` draws from OS entropy.
+        Ignored on the exact branch, which is deterministic by construction.
+    """
     s_T1 = np.array(s_T1, dtype=np.float64)
     s_T2 = np.array(s_T2, dtype=np.float64)
     n = len(s_T1)
@@ -58,11 +72,12 @@ def permutation_pval(s_T1, s_T2, n_samples=10_000):
             total += 1
         return count / total
 
+    rng = np.random.default_rng(seed)
     count = 1
     total = 1
     rng_combined = combined.copy()
     for _ in range(n_samples - 1):
-        np.random.shuffle(rng_combined)
+        rng.shuffle(rng_combined)
         si = rng_combined[:n].sum()
         if si >= observed:
             count += 1

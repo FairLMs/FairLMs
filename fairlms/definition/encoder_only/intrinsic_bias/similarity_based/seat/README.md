@@ -53,7 +53,7 @@ C1–C4 (race / gender / disease / age), word lists hard-coded in
 | Per-term vector | the 5 template sentence embeddings are **averaged into one vector per word** | `seat.py` |
 | Effect size | Cohen's d, pooled std (ddof=1) | `fairlms.utils` → `cohens_d()` |
 | p-value | one-sided permutation test, `n_samples = 10000` | `fairlms.utils` → `permutation_pval()` |
-| Seed | `np.random.seed(43)` before every test | `main.py` → `run_seat()` |
+| Seed | `seed` constructor param, drives a generator local to the call. Unseeded (`None`) by default; `SEAT(seed=0)` pins the sampled p-value. Moot on the exact-enumeration branch | `fairlms.metrics` → `SEAT` |
 
 ## How to run
 
