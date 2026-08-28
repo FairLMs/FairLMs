@@ -427,13 +427,13 @@ scientific conclusion change too.
 - See [Preparing representativeness evidence](preparing_representativeness_evidence.md)
   for counts, records, DataFrames, unknown values, multi-label policies,
   references, and a complete `b_rep` audit.
-- See [`scorer_mean_gap_diagnostic.py`](../examples/scorer_mean_gap_diagnostic.py)
+- See [`scorer_mean_gap_diagnostic.py`](https://github.com/michaellarionov/FairLMs/blob/main/examples/scorer_mean_gap_diagnostic.py)
   for an unfamiliar result schema with explicit group and score mappings.
-- See [`scorer_rate_gap_diagnostic.py`](../examples/scorer_rate_gap_diagnostic.py)
+- See [`scorer_rate_gap_diagnostic.py`](https://github.com/michaellarionov/FairLMs/blob/main/examples/scorer_rate_gap_diagnostic.py)
   for an explicit score-to-event rule, per-group denominators and event counts,
   and a complete `score_rate_gap` report.
-- See [`scorer_distribution_gap_diagnostic.py`](../examples/scorer_distribution_gap_diagnostic.py)
+- See [`scorer_distribution_gap_diagnostic.py`](https://github.com/michaellarionov/FairLMs/blob/main/examples/scorer_distribution_gap_diagnostic.py)
   for equal group means and threshold rates but a non-zero empirical W1 gap.
-- See [`scorer_counterfactual_sensitivity_diagnostic.py`](../examples/scorer_counterfactual_sensitivity_diagnostic.py)
+- See [`scorer_counterfactual_sensitivity_diagnostic.py`](https://github.com/michaellarionov/FairLMs/blob/main/examples/scorer_counterfactual_sensitivity_diagnostic.py)
   for explicit pair/condition/score mappings and a declared minimal-contrast
   basis on an unfamiliar result schema.

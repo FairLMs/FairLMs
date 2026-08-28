@@ -1,0 +1,65 @@
+name: docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A single queue for Pages: concurrent deploys of the same site race each other,
+# and cancelling a half-finished deploy can leave the site inconsistent.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # `fairlms` imports torch at module scope, so the docs build needs it even
+      # though it renders no tensors. Same reasoning as tests.yml: the default
+      # PyPI linux wheel drags in ~2 GB of CUDA packages for nothing.
+      - name: Install CPU-only torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install package with docs extra
+        run: pip install -e ".[docs]"
+
+      # The registry pages are generated from the live registries, so a metric
+      # added without regenerating them would ship a docs table that disagrees
+      # with the code. This fails the build instead.
+      - name: Registry tables must match the code
+        run: python scripts/gen_registry_docs.py --check
+
+      - name: Build (warnings are errors)
+        run: mkdocs build --strict
+
+      # Only main is ever deployed, so uploading the artifact from PR runs would
+      # be wasted work. PRs still get the full --check and --strict validation.
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: site
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

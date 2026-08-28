@@ -31,3 +31,6 @@ fairlms/artifacts/*
 **/red_pill_corpus.csv
 **/nyu-mll BBQ main data.zip
 **/*.zip
+
+# mkdocs build output
+site/

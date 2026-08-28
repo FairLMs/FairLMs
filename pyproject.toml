@@ -83,6 +83,15 @@ all = [
     "gender-guesser",
     "tqdm",
 ]
+docs = [
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.24",
+  "mkdocs-jupyter>=0.24",
+  # mkdocstrings needs a formatter to render `separate_signature: true`
+  # signatures; without one it logs "Formatting signatures requires either
+  # Black or Ruff to be installed" and emits them unformatted.
+  "black>=24.1",
+]
 
 [tool.setuptools.dynamic]
 version = { attr = "fairlms._version.__version__" }

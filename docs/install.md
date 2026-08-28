@@ -1,0 +1,51 @@
+# Installation
+
+```bash
+pip install fairlms
+```
+
+Requires Python 3.10 or later.
+
+## Extras
+
+| Extra | Command | Adds |
+|---|---|---|
+| `openai` | `pip install "fairlms[openai]"` | `openai` — API-served decoder wrappers |
+| `dev` | `pip install "fairlms[dev]"` | `pytest`, `pytest-cov`, plus `openai` |
+| `all` | `pip install "fairlms[all]"` | `openai`, `dev`, `accelerate`, `sentencepiece`, `gender-guesser`, `tqdm` |
+| `docs` | `pip install "fairlms[docs]"` | `mkdocs-material`, `mkdocstrings[python]`, `mkdocs-jupyter` |
+
+`torch`, `transformers`, `datasets`, `scikit-learn`, `wordfreq` and `nltk` are
+required dependencies, not extras: `fairlms.metrics` imports every metric family
+eagerly, so `import fairlms` needs them present.
+
+## From source
+
+```bash
+git clone https://github.com/michaellarionov/FairLMs.git
+cd FairLMs
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+pytest
+```
+
+Prefer a tag over `main` when installing from source — `main` tracks unreleased
+work, so any push can change behaviour under you.
+
+## Verify the install
+
+```bash
+python -c "import fairlms; print(fairlms.__version__)"
+```
+
+## Dataset licenses
+
+The library is MIT licensed; each benchmark retains its own license.
+
+CrowS-Pairs and BBQ are **bundled** with the package, so those metrics run
+offline. StereoSet, Bias in Bios, WinoBias and XNLI are downloaded from the
+Hugging Face Hub at first use. See [Loaders](registry/loaders.md) for the
+per-loader breakdown.
+
+Gated or rate-limited Hub downloads pick up `HF_TOKEN` or
+`HUGGING_FACE_HUB_TOKEN` from the environment automatically.
