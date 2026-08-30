@@ -1,5 +1,21 @@
 # Citing FairLMs
 
+## The paper
+
+```bibtex
+@unpublished{larionov_fairlms_paper,
+  author = {Larionov, Michael and Zhang, Jiale and Yin, Zhipeng and
+            Wang, Zichong and Zhang, Wenbin},
+  title  = {{FairLMs}: A Turnkey Library for Fairness in Language Models},
+  note   = {Manuscript},
+  year   = {2026}
+}
+```
+
+!!! note "Update on acceptance"
+    Venue, volume and page details are not filled in above because they are not
+    settled. Replace this entry with the published `@article` when it is.
+
 ## The software
 
 Cite the release you actually ran. Version numbers matter here more than usual:
@@ -8,8 +24,9 @@ metric definitions and their reported units have changed between versions, so
 
 ```bibtex
 @software{larionov_fairlms,
-  author  = {Larionov, Michael},
-  title   = {{FairLMs}: fairness definitions and bias metrics for language models},
+  author  = {Larionov, Michael and Zhang, Jiale and Yin, Zhipeng and
+             Wang, Zichong and Zhang, Wenbin},
+  title   = {{FairLMs}: A Turnkey Library for Fairness in Language Models},
   url     = {https://github.com/michaellarionov/FairLMs},
   version = {0.4.0},
   license = {MIT},
