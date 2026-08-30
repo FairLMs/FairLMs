@@ -46,6 +46,14 @@ class FairnessMetric(ABC):
     bias_type: str = ""  # "intrinsic" | "extrinsic"
     architectures: Tuple[str, ...] = ()
 
+    #: The ``task`` a Hugging Face checkpoint must be loaded with for this
+    #: metric to read the quantity it is defined on — one of ``mlm``,
+    #: ``encoder``, ``sequence_classification``, ``seq2seq``, ``causal``.
+    #: Checked by :func:`fairlms.metrics.resolve.check_task` when the metric
+    #: resolves a model. ``None`` means the metric imposes no requirement:
+    #: it scores precomputed predictions, calls an API, or accepts any head.
+    required_task: Optional[str] = None
+
     # -- sklearn-style parameter introspection ------------------------------
     @classmethod
     def _param_names(cls) -> List[str]:

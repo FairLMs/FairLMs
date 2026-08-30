@@ -68,14 +68,16 @@ def metrics_page() -> str:
     rows = []
     for name, cls in sorted(METRIC_REGISTRY.items()):
         rows.append(
-            "| `{name}` | `{cls}` | {alias} | {bias} | {arch} |".format(
+            "| `{name}` | `{cls}` | {alias} | {bias} | {arch} | {task} |".format(
                 name=name,
                 cls=cls.__name__,
                 alias=_fmt(sorted(aliases.get(cls, ()))),
                 bias=f"`{cls.bias_type}`" if cls.bias_type else "—",
                 arch=_fmt(cls.architectures),
+                task=_fmt(cls.required_task),
             )
         )
+    n_free = sum(1 for c in METRIC_REGISTRY.values() if c.required_task is None)
 
     return (
         HEADER
@@ -84,13 +86,17 @@ def metrics_page() -> str:
         "name with `fairlms.metrics.get_metric(name)`, or import the class "
         "directly. Every metric exposes "
         "`compute(model, data) -> MetricResult`.\n\n"
-        "`bias_type` and `architectures` are declarations carried on the class; "
-        "they document which conceptual family a metric belongs to and which "
-        "model architectures it was defined for. They are not enforced at "
-        "call time — see [Models](../api/models.md) for how a checkpoint is "
-        "loaded for a given head.\n\n"
-        "| Registry name | Class | Alias | Bias type | Architectures |\n"
-        "|---|---|---|---|---|\n" + "\n".join(rows) + "\n"
+        "`bias_type` and `architectures` document where a metric sits in the "
+        "taxonomy. **`required_task` is enforced**: it names the head the "
+        "checkpoint must be loaded with, and a mismatch is refused before the "
+        "metric runs rather than surfacing as a missing attribute or as "
+        "numbers read off an untrained head. See "
+        "[Models](../api/models.md).\n\n"
+        f"The {n_free} metrics with no required task score precomputed "
+        "predictions, call an API, or take a plain callable, so they impose no "
+        "requirement on how a model was loaded.\n\n"
+        "| Registry name | Class | Alias | Bias type | Architectures | Required task |\n"
+        "|---|---|---|---|---|---|\n" + "\n".join(rows) + "\n"
     )
 
 

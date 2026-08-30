@@ -74,12 +74,27 @@ sentences; 0.5 would mean not recoverable at all. With four items per class and
 `n_seeds=3` that is a demonstration of the mechanics — use hundreds of pairs and
 the default `n_seeds=10` before reporting, and always report `auc_std`.
 
-!!! warning "`counterfactual_auc` labels must be integers"
-    The probe is a binary classifier, so `labels` must be integer class ids.
-    String labels like `["female", "male"]` do not raise — they yield
-    `n_class_0 = 0`, `n_class_1 = 0` and a score of `0.0`, which looks like a
-    finding and is not one. Check `n_class_0` / `n_class_1` in `details` before
-    believing an AUC.
+!!! note "`counterfactual_auc` labels must be integers 0 and 1"
+    The probe is a binary classifier. String labels are refused rather than
+    counted as neither class:
+
+    ```python
+    CounterfactualAucScore().compute(t5, LabeledSentences(sents, ["female", "male", ...]))
+    # TypeError: CounterfactualAucScore labels must be integer class ids, got
+    # 'female', 'male'. ... Encode the attribute first, e.g.
+    # [0 if g == 'male' else 1 for g in groups].
+    ```
+
+    Three other inputs are refused for the same reason — each would otherwise
+    report a score of `0.0`, which is not "no signal" but the *most extreme
+    possible finding*: a class with fewer than two members, more than two
+    distinct classes, and a `test_ratio` so small that no held-out set can
+    contain both classes. All four checks read the labels only, so they never
+    intercept a genuine AUC.
+
+    The lower-level `compute_auc` still returns `0.0` with the rows attached in
+    these cases, by design — it is a diagnostic short-circuit for callers who
+    want to inspect why.
 
 ## Translation similarity needs a second model
 

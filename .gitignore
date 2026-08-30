@@ -34,3 +34,6 @@ fairlms/artifacts/*
 
 # mkdocs build output
 site/
+
+# mkdocs-jupyter render cache
+.cache/

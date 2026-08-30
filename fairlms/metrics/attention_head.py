@@ -63,6 +63,7 @@ class GradientBasedBiasEstimation(FairnessMetric):
     name = "gradient_based_bias_estimation"
     bias_type = "intrinsic"
     architectures = ("decoder_only",)
+    required_task = "causal"
 
     def __init__(
         self, *, loss_scale: float = 1.0, verbose: bool = False, gbe_matrix: Any = None
@@ -111,7 +112,7 @@ class GradientBasedBiasEstimation(FairnessMetric):
                     f"GradientBasedBiasEstimation expects a WordSets as data, got "
                     f"{type(data).__name__}."
                 )
-            tok, hf_model, device = get_tokenizer_model(model, tokenizer)
+            tok, hf_model, device = get_tokenizer_model(model, tokenizer, metric=self)
             matrix = compute_gbe_matrix(
                 hf_model,
                 tok,
@@ -158,6 +159,7 @@ class NaturalIndirectEffect(FairnessMetric):
     name = "natural_indirect_effect"
     bias_type = "intrinsic"
     architectures = ("decoder_only",)
+    required_task = "causal"
 
     def __init__(
         self,
@@ -210,7 +212,7 @@ class NaturalIndirectEffect(FairnessMetric):
                 )
             if not isinstance(data, ProbeSet):
                 data = ProbeSet(data)
-            tok, hf_model, device = get_tokenizer_model(model, tokenizer)
+            tok, hf_model, device = get_tokenizer_model(model, tokenizer, metric=self)
             n_layers, n_heads, head_dim = _derive_head_shape(
                 hf_model.config,
                 legacy.get("n_layers", legacy.get("N_LAYERS", self.n_layers)),

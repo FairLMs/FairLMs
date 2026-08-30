@@ -27,19 +27,57 @@ def get_examples(dataset: Any) -> Optional[List[Any]]:
         ) from exc
 
 
+def check_task(loaded: Any, metric: Any) -> None:
+    """Refuse a model loaded for the wrong head.
+
+    A metric declares ``required_task``; a :class:`~fairlms.models.LoadedModel`
+    records the ``task`` it was loaded with. When both are known and disagree,
+    the metric would otherwise fail deep in its own numerics — with an
+    ``AttributeError`` on a missing ``.logits``, or, worse, with plausible
+    numbers read off a randomly initialized head. Fail here instead, naming
+    both sides.
+
+    Silent when either side is unknown: raw ``(tokenizer, model)`` tuples carry
+    no task, and metrics that work on any head leave ``required_task`` as
+    ``None``.
+    """
+    required = getattr(metric, "required_task", None)
+    if required is None:
+        return
+    actual = getattr(loaded, "task", None)
+    if actual is None or actual == required:
+        return
+    name = type(metric).__name__ if not isinstance(metric, str) else metric
+    raise TypeError(
+        f"{name} requires a model loaded with task={required!r}, got "
+        f"task={actual!r}. Reload the checkpoint as "
+        f"HuggingFaceModel(name, task={required!r}) — the task selects which "
+        f"head is attached, and this metric reads a quantity that "
+        f"task={actual!r} does not expose."
+    )
+
+
 def get_tokenizer_model(
     model: Any,
     tokenizer: Any = None,
+    *,
+    metric: Any = None,
 ) -> Tuple[Any, Any, torch.device]:
-    """Return ``(tokenizer, model, device)`` from adapters or raw objects."""
+    """Return ``(tokenizer, model, device)`` from adapters or raw objects.
+
+    Pass ``metric=self`` from a metric to have the model's ``task`` checked
+    against that metric's ``required_task`` — see :func:`check_task`.
+    """
     if model is None:
         raise TypeError("model is required for this metric")
 
     if isinstance(model, ModelAdapter):
         loaded = model.load()
+        check_task(loaded, metric)
         return loaded.tokenizer, loaded.model, loaded.device
 
     if isinstance(model, LoadedModel):
+        check_task(model, metric)
         return model.tokenizer, model.model, model.device
 
     if isinstance(model, (tuple, list)) and len(model) >= 2:

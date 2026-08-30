@@ -143,6 +143,7 @@ class WEAT(FairnessMetric):
     name = "weat"
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
+    required_task = "encoder"
 
     def __init__(
         self,
@@ -217,7 +218,7 @@ class WEAT(FairnessMetric):
                     "WEAT needs a model to embed WordSets. Pass an encoder model, "
                     "or supply precomputed embeddings as a VectorSets."
                 )
-            tok, hf_model, device = get_tokenizer_model(model, tokenizer)
+            tok, hf_model, device = get_tokenizer_model(model, tokenizer, metric=self)
             T1 = self._embed(hf_model, tok, data.target_1, device, pooling)
             T2 = self._embed(hf_model, tok, data.target_2, device, pooling)
             A = self._embed(hf_model, tok, data.attribute_1, device, pooling)
@@ -274,6 +275,7 @@ class SEAT(FairnessMetric):
     name = "seat"
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
+    required_task = "encoder"
 
     def __init__(
         self,
@@ -328,7 +330,7 @@ class SEAT(FairnessMetric):
 
         if model is None:
             raise ValueError("SEAT requires an encoder model to embed templates.")
-        tok, hf_model, device = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, device = get_tokenizer_model(model, tokenizer, metric=self)
 
         effect, p = compute_seat(
             hf_model,
@@ -378,6 +380,7 @@ class CEAT(FairnessMetric):
     name = "ceat"
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
+    required_task = "encoder"
 
     def __init__(
         self,
@@ -433,7 +436,7 @@ class CEAT(FairnessMetric):
 
         if model is None:
             raise ValueError("CEAT requires an encoder model to embed contexts.")
-        tok, hf_model, device = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, device = get_tokenizer_model(model, tokenizer, metric=self)
 
         result = compute_ceat(
             hf_model,

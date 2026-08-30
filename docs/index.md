@@ -16,12 +16,21 @@ zero** — the distinction between "no disparity" and "you have not given me wha
 I need to say anything" is preserved in the report rather than collapsed into a
 number.
 
+The metrics hold to the same rule where they can. Each declares the model head
+it reads, so a checkpoint loaded for the wrong task is refused rather than
+scored; and inputs on which a metric cannot estimate anything are rejected
+instead of returning a zero that reads as a finding. See
+[Divergences](registry/divergences.md).
+
 <div class="grid cards" markdown>
 
 - **[Install](install.md)** — `pip install fairlms`
 - **[Quickstart](quickstart.md)** — first metric in ten lines
+- **[Tour](notebooks/tour.ipynb)** — the whole library in one runnable notebook
+- **[Taxonomy](taxonomy.md)** — how the 33 metrics are organised
 - **[Registry](registry/metrics.md)** — every metric, loader and diagnostic
 - **[API reference](api/metrics.md)** — full generated reference
+- **[Citing FairLMs](citation.md)** — and what to record for reproducibility
 
 </div>
 

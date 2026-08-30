@@ -121,7 +121,7 @@ class TestUsableByMetrics:
         """
         seen = {}
 
-        def fake_get_tokenizer_model(model, tokenizer=None):
+        def fake_get_tokenizer_model(model, tokenizer=None, **kwargs):
             seen["model"] = model
             raise _StopBeforeEmbedding
 

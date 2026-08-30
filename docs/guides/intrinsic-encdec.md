@@ -76,30 +76,62 @@ or a task-specific checkpoint for anything you intend to report — the metrics
 measure the model's output, so a model that generates poorly produces
 uninformative scores rather than an error.
 
-## SD is a French-translation cue task, not a generic scorer
+## SD is a French-translation cue task
 
-Worth knowing before you use it: `stereotypical_divergence` scores whether the
-model prefers a gendered French continuation (`Il`/`Lui` vs `Elle`/`Celle-ci`)
-for each source sentence, and compares that accuracy between the stereotype and
-anti-stereotype sets. So `labels` must be `"male"` or `"female"` — any other
-string silently scores `0.5` for that row rather than raising, which is how you
-get a suspiciously flat `m_stereo == m_anti == 0.5`.
+`stereotypical_divergence` scores whether the model prefers a gendered French
+continuation (`Il`/`Lui` vs `Elle`/`Celle-ci`) for each source sentence, and
+compares that accuracy between the stereotype and anti-stereotype sets. So
+`labels` must come from the scorer's own vocabulary — `"male"` / `"female"` by
+default, `"young"` / `"old"` with `age_accuracy`.
 
-!!! warning "`metric_fn` is a closed set, not a free hook"
-    Despite the signature, `metric_fn` is dispatched by function `__name__`
-    through a two-entry table. Only two callables work:
+The scorers return 0.5 for a gold label they don't recognise, which is the right
+answer for one unknown row and a trap for a whole wrong vocabulary. A complete
+mismatch is refused:
 
-    ```python
-    from fairlms.definition.encoder_decoder.intrinsic_bias.stereotypical_association.sd.sd import (
-        age_accuracy, pronoun_accuracy,
-    )
+```python
+StereotypicalDivergence().compute(t5, StereotypeLabelled(
+    stereotype=LabeledSentences(sentences=[...], labels=["negative"]),
+    anti_stereotype=LabeledSentences(sentences=[...], labels=["negative"]),
+))
+# ValueError: StereotypicalDivergence with metric_fn='pronoun_accuracy' scores
+# labels from ('male', 'female'), but none of the 2 labels supplied is one of
+# those (saw ['negative']). Every row would score 0.5 and the divergence would
+# be 0.0 regardless of the model.
+```
 
-    StereotypicalDivergence(metric_fn=age_accuracy)   # labels: "young" / "old"
-    ```
+Individual unrecognised labels still score as chance, which is what 0.5 is for.
 
-    Passing a lambda or your own function raises `KeyError: '<lambda>'`, because
-    each scorer is paired with a specific prediction routine (French gender cues
-    or French age cues). `metric_fn=None` uses `pronoun_accuracy`.
+## Custom scoring
+
+Each built-in scorer grades the output of a specific prediction routine, so the
+two travel together. Use `age_accuracy` for the age variant:
+
+```python
+from fairlms.definition.encoder_decoder.intrinsic_bias.stereotypical_association.sd.sd import (
+    age_accuracy,
+)
+
+StereotypicalDivergence(metric_fn=age_accuracy)   # labels: "young" / "old"
+```
+
+For anything else, supply both halves — your scorer and the routine that
+produces the labels it grades:
+
+```python
+def my_scorer(predicted, gold):
+    return 1.0 if predicted == gold else 0.0
+
+def my_predictor(model, tokenizer, sentence):
+    ...        # -> a label string
+    return "female" if sentence.startswith("she") else "male"
+
+StereotypicalDivergence(metric_fn=my_scorer, predict_fn=my_predictor)
+```
+
+A custom `metric_fn` without a `predict_fn` raises `ValueError` naming both the
+built-ins and this escape hatch, rather than being silently mis-paired with the
+French gender predictor. Label-domain validation is skipped for a custom
+pairing — the vocabulary is then yours to define.
 
 ## Head attribution
 

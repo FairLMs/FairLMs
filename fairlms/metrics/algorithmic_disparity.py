@@ -74,6 +74,7 @@ class LexicalFrequencyProportion(_TranslationCorpusMetric):
     """
 
     name = "lexical_frequency_proportion"
+    required_task = "seq2seq"
 
     def compute(
         self,
@@ -84,7 +85,7 @@ class LexicalFrequencyProportion(_TranslationCorpusMetric):
         **legacy: Any,
     ) -> MetricResult:
         sentences = self._prepare(data, legacy)
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         pb1, pb2, pb3, rows = compute_lfp(
             hf_model,
             tok,
@@ -110,6 +111,7 @@ class MorphologicalChoiceDivergence(_TranslationCorpusMetric):
     """
 
     name = "morphological_choice_divergence"
+    required_task = "seq2seq"
 
     def compute(
         self,
@@ -120,7 +122,7 @@ class MorphologicalChoiceDivergence(_TranslationCorpusMetric):
         **legacy: Any,
     ) -> MetricResult:
         sentences = self._prepare(data, legacy)
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         mean_h, mean_d, rows = compute_mcd(
             hf_model,
             tok,

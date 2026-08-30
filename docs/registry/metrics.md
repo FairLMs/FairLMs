@@ -4,40 +4,42 @@
 
 33 registered metrics. Instantiate any of them by registry name with `fairlms.metrics.get_metric(name)`, or import the class directly. Every metric exposes `compute(model, data) -> MetricResult`.
 
-`bias_type` and `architectures` are declarations carried on the class; they document which conceptual family a metric belongs to and which model architectures it was defined for. They are not enforced at call time — see [Models](../api/models.md) for how a checkpoint is loaded for a given head.
+`bias_type` and `architectures` document where a metric sits in the taxonomy. **`required_task` is enforced**: it names the head the checkpoint must be loaded with, and a mismatch is refused before the metric runs rather than surfacing as a missing attribute or as numbers read off an untrained head. See [Models](../api/models.md).
 
-| Registry name | Class | Alias | Bias type | Architectures |
-|---|---|---|---|---|
-| `accuracy_disparity` | `AccuracyDisparity` | — | `extrinsic` | `decoder_only` |
-| `all_unmasked_likelihood_attention_score` | `AllUnmaskedLikelihoodAttentionScore` | `AULA` | `intrinsic` | `encoder_only` |
-| `all_unmasked_likelihood_score` | `AllUnmaskedLikelihoodScore` | `AUL` | `intrinsic` | `encoder_only` |
-| `bias_amplifier` | `BiasAmplifierScore` | — | `extrinsic` | `decoder_only` |
-| `ceat` | `CEAT` | — | `intrinsic` | `encoder_only` |
-| `context_association_test` | `ContextAssociationTestScore` | `CAT` | `intrinsic` | `encoder_only` |
-| `context_based_disparity` | `ContextBasedDisparityScore` | — | `extrinsic` | `encoder_only` |
-| `contrast_based_score` | `ContrastBasedScore` | `CBS` | `intrinsic` | `encoder_only` |
-| `cooccurrence_association` | `CooccurrenceAssociation` | — | `intrinsic` | `decoder_only` |
-| `counterfactual_auc` | `CounterfactualAucScore` | — | `extrinsic` | `encoder_decoder` |
-| `counterfactual_fairness` | `CounterfactualFairnessScore` | — | `extrinsic` | `decoder_only` |
-| `counterfactual_robustness` | `CounterfactualRobustness` | — | `extrinsic` | `decoder_only` |
-| `crows_pairs_score` | `CrowSPairsScore` | `CPS` | `intrinsic` | `encoder_only` |
-| `demographic_next_token_proportion` | `DemographicNextTokenProportion` | — | `extrinsic` | `decoder_only` |
-| `demographic_representation_divergence` | `DemographicRepresentationDivergence` | — | `extrinsic` | `decoder_only` |
-| `discovery_of_correlations` | `DiscoveryOfCorrelationsScore` | `DisCo` | `intrinsic` | `encoder_only` |
-| `equal_opportunity_gap` | `EqualOpportunityGap` | — | `extrinsic` | `encoder_only` |
-| `fair_inference_score` | `FairInferenceScore` | — | `extrinsic` | `encoder_only` |
-| `gradient_based_bias_estimation` | `GradientBasedBiasEstimation` | — | `intrinsic` | `decoder_only` |
-| `inference_bias_score` | `InferenceBiasScore` | — | `extrinsic` | `encoder_decoder` |
-| `lexical_frequency_proportion` | `LexicalFrequencyProportion` | — | `intrinsic` | `encoder_decoder` |
-| `log_probability_bias_score` | `LogProbabilityBiasScore` | `LPBS` | `intrinsic` | `encoder_only` |
-| `morphological_choice_divergence` | `MorphologicalChoiceDivergence` | — | `intrinsic` | `encoder_decoder` |
-| `natural_indirect_effect` | `NaturalIndirectEffect` | — | `intrinsic` | `decoder_only` |
-| `normalized_position_distance` | `NormalizedPositionDistance` | — | `extrinsic` | `encoder_decoder` |
-| `pseudo_log_likelihood_score` | `PseudoLogLikelihoodScore` | `PLL` | `intrinsic` | `encoder_only` |
-| `seat` | `SEAT` | — | `intrinsic` | `encoder_only` |
-| `sensitive_name_similarity` | `SensitiveNameSimilarity` | — | `extrinsic` | `decoder_only` |
-| `stereotypical_divergence` | `StereotypicalDivergence` | — | `intrinsic` | `encoder_decoder` |
-| `stereotypical_log_likelihood` | `StereotypicalLogLikelihood` | — | `intrinsic` | `decoder_only` |
-| `stereotypical_value_attribution` | `StereotypicalValueAttribution` | — | `intrinsic` | `encoder_decoder` |
-| `translation_similarity_score` | `TranslationSimilarityScore` | — | `extrinsic` | `encoder_decoder` |
-| `weat` | `WEAT` | — | `intrinsic` | `encoder_only` |
+The 9 metrics with no required task score precomputed predictions, call an API, or take a plain callable, so they impose no requirement on how a model was loaded.
+
+| Registry name | Class | Alias | Bias type | Architectures | Required task |
+|---|---|---|---|---|---|
+| `accuracy_disparity` | `AccuracyDisparity` | — | `extrinsic` | `decoder_only` | — |
+| `all_unmasked_likelihood_attention_score` | `AllUnmaskedLikelihoodAttentionScore` | `AULA` | `intrinsic` | `encoder_only` | `mlm` |
+| `all_unmasked_likelihood_score` | `AllUnmaskedLikelihoodScore` | `AUL` | `intrinsic` | `encoder_only` | `mlm` |
+| `bias_amplifier` | `BiasAmplifierScore` | — | `extrinsic` | `decoder_only` | — |
+| `ceat` | `CEAT` | — | `intrinsic` | `encoder_only` | `encoder` |
+| `context_association_test` | `ContextAssociationTestScore` | `CAT` | `intrinsic` | `encoder_only` | `mlm` |
+| `context_based_disparity` | `ContextBasedDisparityScore` | — | `extrinsic` | `encoder_only` | — |
+| `contrast_based_score` | `ContrastBasedScore` | `CBS` | `intrinsic` | `encoder_only` | `mlm` |
+| `cooccurrence_association` | `CooccurrenceAssociation` | — | `intrinsic` | `decoder_only` | `causal` |
+| `counterfactual_auc` | `CounterfactualAucScore` | — | `extrinsic` | `encoder_decoder` | `seq2seq` |
+| `counterfactual_fairness` | `CounterfactualFairnessScore` | — | `extrinsic` | `decoder_only` | — |
+| `counterfactual_robustness` | `CounterfactualRobustness` | — | `extrinsic` | `decoder_only` | — |
+| `crows_pairs_score` | `CrowSPairsScore` | `CPS` | `intrinsic` | `encoder_only` | `mlm` |
+| `demographic_next_token_proportion` | `DemographicNextTokenProportion` | — | `extrinsic` | `decoder_only` | `causal` |
+| `demographic_representation_divergence` | `DemographicRepresentationDivergence` | — | `extrinsic` | `decoder_only` | `causal` |
+| `discovery_of_correlations` | `DiscoveryOfCorrelationsScore` | `DisCo` | `intrinsic` | `encoder_only` | `mlm` |
+| `equal_opportunity_gap` | `EqualOpportunityGap` | — | `extrinsic` | `encoder_only` | — |
+| `fair_inference_score` | `FairInferenceScore` | — | `extrinsic` | `encoder_only` | — |
+| `gradient_based_bias_estimation` | `GradientBasedBiasEstimation` | — | `intrinsic` | `decoder_only` | `causal` |
+| `inference_bias_score` | `InferenceBiasScore` | — | `extrinsic` | `encoder_decoder` | — |
+| `lexical_frequency_proportion` | `LexicalFrequencyProportion` | — | `intrinsic` | `encoder_decoder` | `seq2seq` |
+| `log_probability_bias_score` | `LogProbabilityBiasScore` | `LPBS` | `intrinsic` | `encoder_only` | `mlm` |
+| `morphological_choice_divergence` | `MorphologicalChoiceDivergence` | — | `intrinsic` | `encoder_decoder` | `seq2seq` |
+| `natural_indirect_effect` | `NaturalIndirectEffect` | — | `intrinsic` | `decoder_only` | `causal` |
+| `normalized_position_distance` | `NormalizedPositionDistance` | — | `extrinsic` | `encoder_decoder` | `seq2seq` |
+| `pseudo_log_likelihood_score` | `PseudoLogLikelihoodScore` | `PLL` | `intrinsic` | `encoder_only` | `mlm` |
+| `seat` | `SEAT` | — | `intrinsic` | `encoder_only` | `encoder` |
+| `sensitive_name_similarity` | `SensitiveNameSimilarity` | — | `extrinsic` | `decoder_only` | — |
+| `stereotypical_divergence` | `StereotypicalDivergence` | — | `intrinsic` | `encoder_decoder` | `seq2seq` |
+| `stereotypical_log_likelihood` | `StereotypicalLogLikelihood` | — | `intrinsic` | `decoder_only` | `causal` |
+| `stereotypical_value_attribution` | `StereotypicalValueAttribution` | — | `intrinsic` | `encoder_decoder` | `seq2seq` |
+| `translation_similarity_score` | `TranslationSimilarityScore` | — | `extrinsic` | `encoder_decoder` | `seq2seq` |
+| `weat` | `WEAT` | — | `intrinsic` | `encoder_only` | `encoder` |

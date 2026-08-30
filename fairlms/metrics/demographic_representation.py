@@ -71,6 +71,7 @@ class DemographicNextTokenProportion(_DemographicPromptMetric):
     """
 
     name = "demographic_next_token_proportion"
+    required_task = "causal"
 
     def compute(
         self,
@@ -83,7 +84,7 @@ class DemographicNextTokenProportion(_DemographicPromptMetric):
         prompts = self._prepare(data, legacy)
         prompts.require_neutral("DemographicNextTokenProportion")
 
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         mean_ps, mean_psp, mean_pd, rows = compute_dnp(
             hf_model,
             tok,
@@ -114,6 +115,7 @@ class DemographicRepresentationDivergence(_DemographicPromptMetric):
     """
 
     name = "demographic_representation_divergence"
+    required_task = "causal"
 
     def __init__(self, *, max_new_tokens: int = 50):
         self.max_new_tokens = max_new_tokens
@@ -128,7 +130,7 @@ class DemographicRepresentationDivergence(_DemographicPromptMetric):
     ) -> MetricResult:
         prompts = self._prepare(data, legacy, "max_new_tokens")
 
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         drd, n_s, n_sp, rows = compute_drd(
             hf_model,
             tok,

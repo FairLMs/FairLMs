@@ -64,7 +64,7 @@ class _PairMetric(FairnessMetric):
         return pairs
 
     def _run(self, model, pairs, tokenizer, **compute_kwargs) -> MetricResult:
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         score, accuracy, per_bias_type = type(self)._compute_fn(
             tok, hf_model, pairs, **compute_kwargs
         )
@@ -100,6 +100,7 @@ class CrowSPairsScore(_PairMetric):
     """
 
     name = "crows_pairs_score"
+    required_task = "mlm"
     _compute_fn = staticmethod(compute_cps)
 
 
@@ -107,6 +108,7 @@ class PseudoLogLikelihoodScore(_PairMetric):
     """Full-sentence pseudo log-likelihood preference score."""
 
     name = "pseudo_log_likelihood_score"
+    required_task = "mlm"
     _compute_fn = staticmethod(compute_pll)
 
 
@@ -121,6 +123,7 @@ class AllUnmaskedLikelihoodScore(_PairMetric):
     """
 
     name = "all_unmasked_likelihood_score"
+    required_task = "mlm"
     _compute_fn = staticmethod(compute_aul)
     _extra_allowed = ("use_attention",)
 
@@ -135,6 +138,7 @@ class AllUnmaskedLikelihoodAttentionScore(_PairMetric):
     """Attention-weighted AUL (AULA)."""
 
     name = "all_unmasked_likelihood_attention_score"
+    required_task = "mlm"
     _compute_fn = staticmethod(compute_aula)
     _extra_allowed = ("use_attention",)
 
@@ -155,6 +159,7 @@ class ContextAssociationTestScore(FairnessMetric):
     name = "context_association_test"
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
+    required_task = "mlm"
 
     def compute(
         self,
@@ -195,7 +200,7 @@ class ContextAssociationTestScore(FairnessMetric):
                 )
             )
 
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         ss, lms, icat, rows = compute_ss(
             hf_model,
             tok,

@@ -330,6 +330,56 @@ class TestCounterfactualAuc:
                 n_seed=2,
             )
 
+    # -- the metric refuses what compute_auc merely short-circuits -----------
+    #
+    # compute_auc returns 0.0 and hands back the rows so a caller can see why.
+    # As a *score*, 0.0 is the most extreme possible finding (perfectly
+    # anti-recoverable), so the metric decides these cases up front instead.
+
+    def test_string_labels_are_refused_rather_than_scored_as_zero(
+        self, seq2seq_bundle
+    ):
+        with pytest.raises(TypeError, match="must be integer class ids"):
+            CounterfactualAucScore().compute(
+                seq2seq_bundle,
+                LabeledSentences(
+                    HE_SENTENCES + SHE_SENTENCES,
+                    ["male"] * 4 + ["female"] * 4,
+                ),
+            )
+
+    def test_non_binary_classes_are_refused(self, seq2seq_bundle):
+        with pytest.raises(ValueError, match="exactly two classes"):
+            CounterfactualAucScore().compute(
+                seq2seq_bundle,
+                LabeledSentences(HE_SENTENCES + SHE_SENTENCES, [0, 1, 2, 0] * 2),
+            )
+
+    def test_a_class_with_fewer_than_two_members_is_refused(self, seq2seq_bundle):
+        with pytest.raises(ValueError, match="at least two members of each"):
+            CounterfactualAucScore().compute(
+                seq2seq_bundle, LabeledSentences(HE_SENTENCES[:3], [0, 0, 1])
+            )
+
+    def test_a_test_ratio_that_cannot_hold_both_classes_is_refused(
+        self, seq2seq_bundle
+    ):
+        with pytest.raises(ValueError, match="cannot\n?\\s*contain both classes|cannot"):
+            CounterfactualAucScore(test_ratio=0.05).compute(
+                seq2seq_bundle,
+                LabeledSentences(HE_SENTENCES + SHE_SENTENCES, [0] * 4 + [1] * 4),
+            )
+
+    def test_a_genuine_zero_is_still_reportable(self, seq2seq_bundle):
+        # The guards are all decidable from the labels, so they never intercept
+        # a real AUC — including one that legitimately lands at an extreme.
+        result = CounterfactualAucScore(test_ratio=0.5, n_seeds=4).compute(
+            seq2seq_bundle,
+            LabeledSentences(HE_SENTENCES + SHE_SENTENCES, [0] * 4 + [1] * 4),
+        )
+        assert result.score == 1.0
+        assert result.details["n_class_0"] == 4
+
 
 # ---------------------------------------------------------------------------
 # IBS
@@ -979,16 +1029,16 @@ class TestStereotypicalDivergence:
         assert result.details["m_stereo"] == 1.0
         assert result.details["m_anti"] == 0.0
 
-    def test_an_arbitrary_metric_fn_has_no_matching_predictor(self):
-        # The predictor is looked up by the scorer's __name__, so only the two
-        # built-ins are usable. Documented here because the failure is a bare
-        # KeyError rather than a helpful message.
+    def test_a_custom_metric_fn_without_a_predictor_is_a_named_error(self):
+        # Each built-in scorer grades the output of a specific prediction
+        # routine, so an unpaired custom scorer cannot be run. It used to fail
+        # with a bare KeyError from the lookup table.
         model, tokenizer = self._model([1.0] * 8)
 
         def my_scorer(predicted, gold):
             return 1.0
 
-        with pytest.raises(KeyError):
+        with pytest.raises(ValueError, match="No prediction routine is paired"):
             StereotypicalDivergence(metric_fn=my_scorer).compute(
                 (tokenizer, model),
                 StereotypeLabelled(
@@ -996,6 +1046,58 @@ class TestStereotypicalDivergence:
                     LabeledSentences(["she nurse"], ["female"]),
                 ),
             )
+
+    def test_a_custom_metric_fn_runs_when_paired_with_a_predict_fn(self):
+        model, tokenizer = self._model([1.0] * 8)
+
+        def my_scorer(predicted, gold):
+            return 1.0 if predicted == gold else 0.0
+
+        def my_predictor(model, tokenizer, sentence):
+            return "female" if sentence.startswith("she") else "male"
+
+        result = StereotypicalDivergence(
+            metric_fn=my_scorer, predict_fn=my_predictor
+        ).compute(
+            (tokenizer, model),
+            StereotypeLabelled(
+                LabeledSentences(["he doctor"], ["male"]),
+                LabeledSentences(["she nurse"], ["male"]),
+            ),
+        )
+        # The predictor is exact on the stereotype set and wrong on the anti
+        # set. delta_s is m_anti - m_stereo, so the divergence is a full -1.0.
+        assert result.details["m_stereo"] == 1.0
+        assert result.details["m_anti"] == 0.0
+        assert result.score == -1.0
+
+    def test_a_label_vocabulary_the_scorer_cannot_grade_is_refused(self):
+        # pronoun_accuracy scores "male"/"female" and returns 0.5 for anything
+        # else, so a wrong vocabulary used to yield m_stereo == m_anti == 0.5
+        # and a divergence of exactly 0.0 — a non-result that reads as parity.
+        model, tokenizer = self._model([1.0] * 8)
+
+        with pytest.raises(ValueError, match="scores labels from"):
+            StereotypicalDivergence().compute(
+                (tokenizer, model),
+                StereotypeLabelled(
+                    LabeledSentences(["he doctor"], ["negative"]),
+                    LabeledSentences(["she nurse"], ["negative"]),
+                ),
+            )
+
+    def test_individual_unknown_labels_still_score_as_chance(self):
+        # Only a *complete* mismatch is an error: 0.5 remains the documented
+        # score for a single unrecognised gold label.
+        model, tokenizer = self._model([2.0, 2.0, 1.0, 1.0] * 2)
+        result = StereotypicalDivergence().compute(
+            (tokenizer, model),
+            StereotypeLabelled(
+                LabeledSentences(["he doctor", "he nurse"], ["male", "unknown"]),
+                LabeledSentences(["she nurse", "she doctor"], ["female", "unknown"]),
+            ),
+        )
+        assert 0.0 <= result.details["m_stereo"] <= 1.0
 
     def test_wrong_container_type_is_an_error(self, seq2seq_bundle):
         with pytest.raises(TypeError, match="expects a StereotypeLabelled"):

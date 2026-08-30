@@ -18,13 +18,14 @@ class MyPairGap(FairnessMetric):
     name = "my_pair_gap"
     bias_type = "intrinsic"                 # "intrinsic" | "extrinsic"
     architectures = ("encoder_only",)       # declaration, for documentation
+    required_task = "mlm"                   # enforced when a model is resolved
 
     def __init__(self, *, n_samples: int = 1000):
         self.n_samples = n_samples           # store verbatim — nothing else
 
     def compute(self, model: Any = None, data: Any = None, **legacy: Any) -> MetricResult:
         self._reject_unknown_kwargs(legacy)
-        tokenizer, hf_model, device = get_tokenizer_model(model)
+        tokenizer, hf_model, device = get_tokenizer_model(model, metric=self)
         ...
         return MetricResult(
             score=float(value),
@@ -33,17 +34,31 @@ class MyPairGap(FairnessMetric):
         )
 ```
 
-## The three class attributes
+## The four class attributes
 
-| Attribute | Purpose |
-|---|---|
-| `name` | the registry key, snake_case |
-| `bias_type` | `"intrinsic"` or `"extrinsic"` |
-| `architectures` | tuple of `"encoder_only"`, `"decoder_only"`, `"encoder_decoder"` |
+| Attribute | Purpose | Enforced? |
+|---|---|---|
+| `name` | the registry key, snake_case | — |
+| `bias_type` | `"intrinsic"` or `"extrinsic"` | no |
+| `architectures` | `"encoder_only"`, `"decoder_only"`, `"encoder_decoder"` | no |
+| `required_task` | which head the checkpoint must be loaded with | **yes** |
 
-`bias_type` and `architectures` are declarations that document where a metric
-sits in the taxonomy and drive the generated
-[registry table](../registry/metrics.md). They are not checked at call time.
+`bias_type` and `architectures` document where a metric sits in the
+[taxonomy](../taxonomy.md) and drive the generated
+[registry table](../registry/metrics.md).
+
+`required_task` is different: it is checked every time your metric resolves a
+model. Declare the task whose head exposes the quantity you read — `"mlm"` for
+vocabulary logits, `"encoder"` for bare hidden states, `"causal"` for
+next-token distributions, `"seq2seq"` for generation,
+`"sequence_classification"` for label logits. A caller who passes the wrong one
+gets a `TypeError` naming both tasks and the fix, instead of an
+`AttributeError` from inside your numerics — or, worse, plausible numbers from
+an untrained head.
+
+Leave it `None` if your metric scores precomputed predictions, calls an API, or
+genuinely works with any head. The check is also skipped for raw
+`(tokenizer, model)` tuples, which carry no task to compare against.
 
 ## What you get for free
 
@@ -68,6 +83,9 @@ accepted input — a `HuggingFaceModel` adapter, a `LoadedModel`, a
 `(tokenizer, model)` tuple, or `model=` plus `tokenizer=` — into one
 `(tokenizer, model, device)` triple. Metrics that score precomputed predictions
 accept `model=None` and skip it entirely.
+
+Pass `metric=self` so the resolver can check your `required_task` against the
+task the model was loaded with; omitting it silently disables that check.
 
 ## Registering
 

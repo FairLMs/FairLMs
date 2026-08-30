@@ -41,6 +41,7 @@ class DiscoveryOfCorrelationsScore(FairnessMetric):
     name = "discovery_of_correlations"
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
+    required_task = "mlm"
 
     def __init__(
         self,
@@ -68,7 +69,7 @@ class DiscoveryOfCorrelationsScore(FairnessMetric):
             return model
         from transformers import pipeline
 
-        tok, hf_model, device = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, device = get_tokenizer_model(model, tokenizer, metric=self)
         return pipeline(
             "fill-mask",
             model=hf_model,
@@ -160,6 +161,7 @@ class LogProbabilityBiasScore(FairnessMetric):
     name = "log_probability_bias_score"
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
+    required_task = "mlm"
 
     def __init__(
         self,
@@ -220,7 +222,7 @@ class LogProbabilityBiasScore(FairnessMetric):
             as_examples(data, "LogProbabilityBiasScore", "a sequence of attribute words")
         )
 
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         outcomes, mean_lpbs, std_lpbs, prop = compute_lpbs(
             tok,
             hf_model,
@@ -266,6 +268,7 @@ class ContrastBasedScore(FairnessMetric):
     name = "contrast_based_score"
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
+    required_task = "mlm"
 
     def __init__(
         self,
@@ -324,7 +327,7 @@ class ContrastBasedScore(FairnessMetric):
                 f"{type(data).__name__}."
             )
 
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         per_group, info = compute_cbs(
             tok,
             hf_model,

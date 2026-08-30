@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, List, Optional, Sequence
 
+import numpy as np
+
 from fairlms.definition.encoder_decoder.extrinsic_bias.counterfactual_fairness.auc import (
     compute_auc,
 )
@@ -64,11 +66,66 @@ class CounterfactualAucScore(FairnessMetric):
     name = "counterfactual_auc"
     bias_type = "extrinsic"
     architectures = ("encoder_decoder",)
+    required_task = "seq2seq"
 
     def __init__(self, *, test_ratio: float = 0.2, seed: int = 42, n_seeds: int = 10):
         self.test_ratio = test_ratio
         self.seed = seed
         self.n_seeds = n_seeds
+
+    @staticmethod
+    def _check_probe_is_estimable(labels, pair_ids, test_ratio: float) -> None:
+        """Refuse inputs on which no AUC can be estimated.
+
+        The underlying ``compute_auc`` returns ``0.0`` when it cannot fit a
+        probe, so that a caller can still inspect the rows. Read as a score,
+        though, ``0.0`` is the *most extreme possible finding* — a perfectly
+        anti-recoverable attribute — and it is indistinguishable from "there
+        was nothing to fit". Every condition that triggers the short-circuit
+        is decidable from the labels alone, so decide it here instead.
+        """
+        non_int = sorted(
+            {repr(label) for label in labels if isinstance(label, bool)
+             or not isinstance(label, (int, np.integer))}
+        )
+        if non_int:
+            raise TypeError(
+                f"CounterfactualAucScore labels must be integer class ids, got "
+                f"{', '.join(non_int[:5])}. The probe is a binary classifier: "
+                f"string labels count as neither class, which would report "
+                f"n_class_0=0, n_class_1=0 and a score of 0.0 without failing. "
+                f"Encode the attribute first, e.g. "
+                f"[0 if g == 'male' else 1 for g in groups]."
+            )
+
+        classes = sorted({int(label) for label in labels})
+        if classes and classes != [0, 1]:
+            raise ValueError(
+                f"CounterfactualAucScore expects exactly two classes labelled 0 "
+                f"and 1, got {classes}."
+            )
+
+        n0 = sum(1 for label in labels if int(label) == 0)
+        n1 = sum(1 for label in labels if int(label) == 1)
+        if n0 < 2 or n1 < 2:
+            raise ValueError(
+                f"CounterfactualAucScore needs at least two members of each "
+                f"class to fit and evaluate a probe, got n_class_0={n0}, "
+                f"n_class_1={n1}."
+            )
+
+        # A held-out set of one row can never contain both classes, so every
+        # split is rejected and no AUC is ever defined.
+        n_units = len(set(pair_ids)) if pair_ids is not None else len(labels)
+        n_test = max(1, round(n_units * test_ratio))
+        if n_test < 2:
+            raise ValueError(
+                f"CounterfactualAucScore: test_ratio={test_ratio} holds out "
+                f"{n_test} of {n_units} "
+                f"{'pairs' if pair_ids is not None else 'rows'}, which cannot "
+                f"contain both classes, so no split is scorable. Raise "
+                f"test_ratio or supply more data."
+            )
 
     def compute(
         self,
@@ -110,14 +167,18 @@ class CounterfactualAucScore(FairnessMetric):
                 )
             )
 
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        test_ratio = legacy.get("test_ratio", self.test_ratio)
+        pair_ids = list(data.pair_ids) if data.pair_ids is not None else None
+        self._check_probe_is_estimable(list(data.labels), pair_ids, test_ratio)
+
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         auc_mean, auc_std, n0, n1, rows = compute_auc(
             hf_model,
             tok,
             list(data.sentences),
             list(data.labels),
-            pair_ids=list(data.pair_ids) if data.pair_ids is not None else None,
-            test_ratio=legacy.get("test_ratio", self.test_ratio),
+            pair_ids=pair_ids,
+            test_ratio=test_ratio,
             seed=legacy.get("seed", self.seed),
             n_seeds=legacy.get("n_seeds", self.n_seeds),
         )
@@ -191,6 +252,7 @@ class NormalizedPositionDistance(FairnessMetric):
     name = "normalized_position_distance"
     bias_type = "extrinsic"
     architectures = ("encoder_decoder",)
+    required_task = "seq2seq"
 
     def __init__(
         self,
@@ -227,7 +289,7 @@ class NormalizedPositionDistance(FairnessMetric):
             data, "NormalizedPositionDistance", "a sequence of articles", "article"
         )
 
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         mean_npd, rows = compute_npd(
             hf_model,
             tok,
@@ -260,6 +322,7 @@ class TranslationSimilarityScore(FairnessMetric):
     name = "translation_similarity_score"
     bias_type = "extrinsic"
     architectures = ("encoder_decoder",)
+    required_task = "seq2seq"
 
     def __init__(
         self,
@@ -317,7 +380,7 @@ class TranslationSimilarityScore(FairnessMetric):
                 f"(original, counterfactual) pair; got {bad[0]!r}."
             )
 
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         mean_ss, std_ss, rows = compute_translation_ss(
             hf_model,
             tok,

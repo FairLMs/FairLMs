@@ -53,6 +53,8 @@ nav:
   - Home: index.md
   - Install: install.md
   - Quickstart: quickstart.md
+  - Tour (notebook): notebooks/tour.ipynb
+  - Taxonomy: taxonomy.md
   - Guides:
       - Bring your own data: guides/own-data.md
       - Intrinsic × encoder-only: guides/intrinsic-encoder.md
@@ -77,6 +79,11 @@ nav:
       - Containers: api/containers.md
       - Diagnostics: api/diagnostics.md
       - Loaders: api/loaders.md
+      - Utils: api/utils.md
+  - About:
+      - Changelog: changelog.md
+      - Citing FairLMs: citation.md
+      - License: license.md
   - Contributing: contributing.md
 
 extra:

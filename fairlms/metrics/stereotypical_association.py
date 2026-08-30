@@ -31,6 +31,7 @@ class StereotypicalLogLikelihood(FairnessMetric):
     name = "stereotypical_log_likelihood"
     bias_type = "intrinsic"
     architectures = ("decoder_only",)
+    required_task = "causal"
 
     def compute(
         self,
@@ -60,7 +61,7 @@ class StereotypicalLogLikelihood(FairnessMetric):
         if not isinstance(data, OccupationTriples):
             data = OccupationTriples(data)
 
-        tok, hf_model, device = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, device = get_tokenizer_model(model, tokenizer, metric=self)
         scores = compute_sll(hf_model, tok, device, list(data.triples))
         primary = float(np.mean([abs(v) for v in scores.values()]))
         details = dict(scores)
@@ -88,6 +89,7 @@ class CooccurrenceAssociation(FairnessMetric):
     name = "cooccurrence_association"
     bias_type = "intrinsic"
     architectures = ("decoder_only",)
+    required_task = "causal"
 
     def __init__(self, *, n_samples: int = 20):
         self.n_samples = n_samples
@@ -129,7 +131,7 @@ class CooccurrenceAssociation(FairnessMetric):
             )
 
         n_samples = legacy.get("n_samples", self.n_samples)
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         mean_tvd, n_valid, n_skipped = compute_ca(
             hf_model,
             tok,

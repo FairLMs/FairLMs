@@ -7,6 +7,7 @@ from typing import Any, Callable, Optional
 import numpy as np
 
 from fairlms.definition.encoder_decoder.intrinsic_bias.stereotypical_association.sd.sd import (
+    LABEL_DOMAIN_FOR,
     compute_sd,
 )
 from fairlms.definition.encoder_decoder.intrinsic_bias.stereotypical_association.sva.sva import (
@@ -24,24 +25,68 @@ class StereotypicalDivergence(FairnessMetric):
     ``data`` is a :class:`~fairlms.metrics.data.StereotypeLabelled` pairing two
     labelled sentence sets.
 
+    The task is a French-translation cue test: the model is scored on whether it
+    prefers a gendered (or age-marked) French continuation for each source
+    sentence, and the two sets' accuracies are compared. ``labels`` must
+    therefore come from the scorer's own vocabulary — ``"male"`` / ``"female"``
+    for the default, ``"young"`` / ``"old"`` for ``age_accuracy``.
+
     Parameters
     ----------
     max_new_tokens:
         Generation budget per sentence.
     metric_fn:
-        Optional callable scoring a prediction against its label. ``None`` uses
-        the built-in exact-match comparison.
+        Scorer comparing a prediction to its gold label. ``None`` uses
+        ``pronoun_accuracy``. The two built-ins (``pronoun_accuracy``,
+        ``age_accuracy``) each imply a prediction routine; supplying any other
+        callable requires ``predict_fn`` as well.
+    predict_fn:
+        ``callable(model, tokenizer, sentence) -> str`` producing the label that
+        ``metric_fn`` grades. Needed only for a custom ``metric_fn``.
     """
 
     name = "stereotypical_divergence"
     bias_type = "intrinsic"
     architectures = ("encoder_decoder",)
+    required_task = "seq2seq"
 
     def __init__(
-        self, *, max_new_tokens: int = 128, metric_fn: Optional[Callable] = None
+        self,
+        *,
+        max_new_tokens: int = 128,
+        metric_fn: Optional[Callable] = None,
+        predict_fn: Optional[Callable] = None,
     ):
         self.max_new_tokens = max_new_tokens
         self.metric_fn = metric_fn
+        self.predict_fn = predict_fn
+
+    @staticmethod
+    def _check_label_domain(metric_fn, predict_fn, *label_sets) -> None:
+        """Refuse a label vocabulary the scorer cannot grade.
+
+        Both built-in scorers return 0.5 for a gold label they do not
+        recognise, so a wholly wrong label vocabulary yields a clean-looking
+        ``m_stereo == m_anti == 0.5`` and a divergence of exactly 0.0 — a
+        non-result indistinguishable from a real finding of parity. Individual
+        unknown labels are still allowed through as chance, which is what 0.5
+        is for; only a complete mismatch is an error.
+        """
+        if predict_fn is not None:
+            return  # custom pairing: the label domain is the caller's to define
+        name = getattr(metric_fn, "__name__", None) if metric_fn else "pronoun_accuracy"
+        domain = LABEL_DOMAIN_FOR.get(name)
+        if domain is None:
+            return
+        labels = [str(label) for labels in label_sets for label in labels]
+        if labels and not any(label in domain for label in labels):
+            raise ValueError(
+                f"StereotypicalDivergence with metric_fn={name!r} scores labels "
+                f"from {domain}, but none of the {len(labels)} labels supplied "
+                f"is one of those (saw {sorted(set(labels))[:5]}). Every row "
+                f"would score 0.5 and the divergence would be 0.0 regardless "
+                f"of the model."
+            )
 
     def compute(
         self,
@@ -75,7 +120,9 @@ class StereotypicalDivergence(FairnessMetric):
                 LabeledSentences(ss, sl), LabeledSentences(asents, al)
             )
 
-        self._reject_unknown_kwargs(legacy, "max_new_tokens", "metric_fn")
+        self._reject_unknown_kwargs(
+            legacy, "max_new_tokens", "metric_fn", "predict_fn"
+        )
         if not isinstance(data, StereotypeLabelled):
             raise TypeError(
                 f"StereotypicalDivergence expects a StereotypeLabelled as data, got "
@@ -83,11 +130,20 @@ class StereotypicalDivergence(FairnessMetric):
             )
 
         metric_fn = legacy.get("metric_fn", self.metric_fn)
+        predict_fn = legacy.get("predict_fn", self.predict_fn)
+        self._check_label_domain(
+            metric_fn,
+            predict_fn,
+            data.stereotype.labels,
+            data.anti_stereotype.labels,
+        )
         sd_kwargs = {"max_new_tokens": legacy.get("max_new_tokens", self.max_new_tokens)}
         if metric_fn is not None:
             sd_kwargs["metric_fn"] = metric_fn
+        if predict_fn is not None:
+            sd_kwargs["predict_fn"] = predict_fn
 
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         m_stereo, m_anti, delta_s, rows = compute_sd(
             hf_model,
             tok,
@@ -135,6 +191,7 @@ class StereotypicalValueAttribution(FairnessMetric):
     name = "stereotypical_value_attribution"
     bias_type = "intrinsic"
     architectures = ("encoder_decoder",)
+    required_task = "seq2seq"
 
     def __init__(
         self,
@@ -201,7 +258,7 @@ class StereotypicalValueAttribution(FairnessMetric):
                 f"{type(data).__name__}."
             )
 
-        tok, hf_model, _ = get_tokenizer_model(model, tokenizer)
+        tok, hf_model, _ = get_tokenizer_model(model, tokenizer, metric=self)
         n_layers, n_heads = self._derive_shape(
             hf_model.config,
             legacy.get("n_layers", self.n_layers),
