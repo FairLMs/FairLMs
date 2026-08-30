@@ -1,5 +1,5 @@
 site_name: FairLMs
-site_description: Fairness definitions and bias metrics for language models
+site_description: A Turnkey Library for Fairness in Language Models
 site_url: https://michaellarionov.github.io/FairLMs/
 repo_url: https://github.com/michaellarionov/FairLMs
 repo_name: michaellarionov/FairLMs

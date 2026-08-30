@@ -14,7 +14,11 @@ requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [
-    { name = "Michael Larionov" },
+    { name = "Michael Larionov", email = "mlariono@andrew.cmu.edu" },
+    { name = "Jiale Zhang", email = "jz106@iu.edu" },
+    { name = "Zhipeng Yin", email = "zyin007@fiu.edu" },
+    { name = "Zichong Wang", email = "zwang114@fiu.edu" },
+    { name = "Wenbin Zhang", email = "wenbin.zhang@fiu.edu" },
 ]
 keywords = [
     "fairness",
