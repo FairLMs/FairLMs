@@ -42,6 +42,10 @@ plugins:
 markdown_extensions:
   - admonition
   - attr_list
+  # Required for the `markdown` attribute on a raw HTML block. Material's
+  # `grid cards` needs it; without it the list inside the <div> is emitted as
+  # literal text instead of being parsed.
+  - md_in_html
   - tables
   - toc: {permalink: true}
   - pymdownx.highlight: {anchor_linenums: true}
