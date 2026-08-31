@@ -4,7 +4,7 @@ Versions follow the scheme described in the
 [README](https://github.com/michaellarionov/FairLMs#versioning): while the
 package is pre-1.0, the minor version moves on behaviour changes and the patch
 version on additions and fixes. Metric definitions can change between minor
-versions, so pin a version when reporting a score — see
+versions, so pin a version when reporting a score. See
 [Citing FairLMs](citation.md).
 
 ## Unreleased
@@ -28,7 +28,7 @@ a `ValueError` naming both the built-ins and the escape hatch.
 **`stereotypical_divergence` validates its label vocabulary.** Its scorers
 return 0.5 for a gold label they do not recognise, so a wholly wrong vocabulary
 (`["negative"]` where `["male", "female"]` was meant) produced
-`m_stereo == m_anti == 0.5` and a divergence of exactly 0.0 — indistinguishable
+`m_stereo == m_anti == 0.5` and a divergence of exactly 0.0, indistinguishable
 from a real finding of parity. A complete mismatch is now an error; individual
 unknown labels still score as chance.
 

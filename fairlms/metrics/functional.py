@@ -1,6 +1,6 @@
 """Plain-function metrics, in the style of ``sklearn.metrics``.
 
-Five of the library's metrics never touch a model — they score predictions you
+Five of the library's metrics never touch a model; they score predictions you
 already have. For those, a class plus ``.compute()`` is ceremony, so they are
 also exposed here as functions with sklearn's ``(y_true, y_pred, ...)`` argument
 order:

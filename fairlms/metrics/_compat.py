@@ -69,7 +69,7 @@ def as_examples(data: Any, metric: str, what: str) -> list:
 def require_mapping_keys(examples: Sequence[Any], metric: str, *keys: str) -> None:
     """Validate that dict-shaped examples carry the keys the metric reads.
 
-    Checks the first element only — enough to turn a ``KeyError`` raised deep in
+    Checks the first element only, which is enough to turn a ``KeyError`` raised deep in
     a scoring loop into an actionable message up front.
     """
     if not examples or not isinstance(examples[0], Mapping):

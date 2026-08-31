@@ -53,7 +53,7 @@ uniform interface, not the measures. A paper reporting a CrowS-Pairs score
 should cite Nangia et al. alongside FairLMs, and likewise for WEAT, StereoSet,
 BBQ and the rest.
 
-Each metric's docstring names its source — visible in the
+Each metric's docstring names its source, visible in the
 [API reference](api/metrics.md) and via `help()`:
 
 ```python
@@ -75,12 +75,12 @@ A bias score is not reproducible from the metric name alone. Alongside the
 citation, report:
 
 - **The FairLMs version**, from `fairlms.__version__`.
-- **The full metric configuration**, which `get_params()` gives you verbatim —
+- **The full metric configuration**, which `get_params()` gives you verbatim:
   this is what `seed`, `n_samples`, `pooling` and the rest were set to.
 - **The checkpoint and its task**, e.g. `bert-base-uncased` with `task="mlm"`.
   The same checkpoint under a different head is a different measurement.
 - **The dataset, split and any subsetting**, including `n_max`.
-- **Anything in `details`** that qualifies the headline number — sample counts,
+- **Anything in `details`** that qualifies the headline number: sample counts,
   the `seed` behind a permutation p-value, the `unit` on a diagnostic.
 
 ```python

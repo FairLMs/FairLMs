@@ -28,7 +28,7 @@ TERMS = (
 # --------------------------------------------------------------------------
 class TestWordSets:
     def test_rejects_bare_string(self):
-        with pytest.raises(TypeError, match="wrap it in a list"):
+        with pytest.raises(TypeError, match="Wrap it in a list"):
             WordSets("Adam", ["a"], ["b"], ["c"])
 
     def test_rejects_empty_role(self):

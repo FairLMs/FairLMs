@@ -1,6 +1,6 @@
 # Extrinsic × encoder-decoder
 
-Four metrics measure extrinsic bias in encoder-decoder models — bias in the
+Four metrics measure extrinsic bias in encoder-decoder models: bias in the
 output of a generation or classification task rather than in internal
 representations.
 
@@ -13,7 +13,7 @@ representations.
 
 Two of them (`counterfactual_auc`, `normalized_position_distance`) need
 `task="seq2seq"`; `inference_bias_score` needs no model at all; and
-`translation_similarity_score` needs two models — a translator and a sentence
+`translation_similarity_score` needs two models: a translator and a sentence
 encoder.
 
 ## End to end
@@ -29,7 +29,7 @@ from fairlms.models import HuggingFaceModel
 
 t5 = HuggingFaceModel("t5-small", task="seq2seq")
 
-# --- IBS: no model — audit (label, prediction) pairs you already have -------
+# --- IBS: no model: audit (label, prediction) pairs you already have -------
 ibs = InferenceBiasScore().compute(None, [
     ("entailment", "entailment"),
     ("entailment", "neutral"),
@@ -71,7 +71,7 @@ print(npd.details["n_articles"])     # 2
 Real output on `t5-small`. `auc.score == 1.0` says the gender attribute is
 perfectly linearly recoverable from the encoder representation on these eight
 sentences; 0.5 would mean not recoverable at all. With four items per class and
-`n_seeds=3` that is a demonstration of the mechanics — use hundreds of pairs and
+`n_seeds=3` that is a demonstration of the mechanics. Use hundreds of pairs and
 the default `n_seeds=10` before reporting, and always report `auc_std`.
 
 !!! note "`counterfactual_auc` labels must be integers 0 and 1"
@@ -85,7 +85,7 @@ the default `n_seeds=10` before reporting, and always report `auc_std`.
     # [0 if g == 'male' else 1 for g in groups].
     ```
 
-    Three other inputs are refused for the same reason — each would otherwise
+    Three other inputs are refused for the same reason; each would otherwise
     report a score of `0.0`, which is not "no signal" but the *most extreme
     possible finding*: a class with fewer than two members, more than two
     distinct classes, and a `test_ratio` so small that no held-out set can
@@ -93,7 +93,7 @@ the default `n_seeds=10` before reporting, and always report `auc_std`.
     intercept a genuine AUC.
 
     The lower-level `compute_auc` still returns `0.0` with the rows attached in
-    these cases, by design — it is a diagnostic short-circuit for callers who
+    these cases, by design; it is a diagnostic short-circuit for callers who
     want to inspect why.
 
 ## Translation similarity needs a second model
@@ -127,7 +127,7 @@ metric in the group that cannot run offline from a clean cache.
 
 `normalized_position_distance` measures whether generated summaries are drawn
 disproportionately from one region of the source document. It has no protected
-attribute and no groups — it belongs in this family because it is a disparity in
+attribute and no groups. It belongs in this family because it is a disparity in
 task output, but do not read it as a demographic fairness claim.
 
 Mechanically: the article is split into sentences and binned into `K` positional
@@ -135,7 +135,7 @@ slots, the summary's sentences are matched back to those slots to give a
 distribution, and the score is the Wasserstein-1 distance between that
 distribution and a reference, divided by `K − 1` so it lands in 0…1.
 
-The reference is **uniform by default** — that is, "a summary should draw evenly
+The reference is **uniform by default**, that is, "a summary should draw evenly
 from the whole document", which is an assumption, not a fact. Pass
 `gold_summaries=` to compare against the positional profile of real reference
 summaries instead:
@@ -149,7 +149,7 @@ which baseline produced a number is always visible in the result.
 
 ## Choosing between them
 
-`inference_bias_score` is free — if you already have NLI predictions, run it.
+`inference_bias_score` is free: if you already have NLI predictions, run it.
 `counterfactual_auc` is the strongest evidence in this group that a model
 *encodes* an attribute rather than merely correlating with it, and it is cheap
 because the probe trains on frozen representations. `translation_similarity_score`

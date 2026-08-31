@@ -9,7 +9,7 @@ import, and it is what the versioning promise covers.
 
 `fairlms/definition/` holds the **implementations**, arranged not by software
 convenience but along the two axes the literature actually organises bias
-measurement by — model architecture and where the bias is measured:
+measurement by, namely model architecture and where the bias is measured:
 
 ```text
 fairlms/definition/
@@ -46,7 +46,7 @@ directory names are conceptual rather than technical.
 **Architecture** decides what a metric can read. An encoder-only model has no
 next-token distribution; a decoder-only model has no `[MASK]` position; only an
 encoder-decoder generates a translation. This is the same distinction the
-`required_task` declaration enforces at runtime — see [Models](api/models.md).
+`required_task` declaration enforces at runtime. See [Models](api/models.md).
 
 **Intrinsic vs extrinsic** decides what the number means:
 
@@ -90,7 +90,7 @@ Keeping `definition/` separate from `metrics/` buys three things:
 
 !!! warning "Leaf runners are repo-only"
     Some leaves read data files that sit beside them and are **not** shipped in
-    the wheel — only `fairlms/data/` (CrowS-Pairs and BBQ) is packaged. The
+    the wheel; only `fairlms/data/` (CrowS-Pairs and BBQ) is packaged. The
     performance-disparity and attention-head leaves in particular need a source
     checkout, and several encoder-decoder leaves download XSum, Europarl,
     WinoBias or XNLI at runtime. The public metrics in `fairlms.metrics` have no

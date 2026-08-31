@@ -23,7 +23,7 @@ class AccuracyDisparity(FairnessMetric):
     """Accuracy gap between a stereotyped set and its counter-stereotyped twin.
 
     ``data`` is a :class:`~fairlms.metrics.data.ScorePair` of per-item scores.
-    No model is used — a plain-function equivalent lives in
+    No model is used; a plain-function equivalent lives in
     :mod:`fairlms.metrics.functional`.
     """
 
@@ -82,7 +82,7 @@ class BiasAmplifierScore(FairnessMetric):
     ----------
     completion_model:
         Completions model used for the forced-choice scoring. This is now
-        actually forwarded — it previously had no effect.
+        actually forwarded; it previously had no effect.
     """
 
     name = "bias_amplifier"

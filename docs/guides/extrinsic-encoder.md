@@ -9,7 +9,7 @@ Three metrics measure extrinsic bias in encoder-only models: bias in the
 | `equal_opportunity_gap` | classification | `GroupPredictions` |
 | `context_based_disparity` | BBQ-style QA | BBQ result dicts (`cond`, `output`, `expected`) |
 
-All three score **predictions, not models** — `compute(None, data)` is the normal
+All three score **predictions, not models**; `compute(None, data)` is the normal
 call. That split is deliberate: you run your own task pipeline once, then audit
 its outputs with as many metrics as you like. The model appears only in the step
 that produces the predictions, which is your code, not the metric's.
@@ -63,19 +63,19 @@ print(y_pred)       # [1, 0, 0, 0]
 
 # --- then audit those outputs ----------------------------------------------
 fis = FairInferenceScore().compute(None, records)
-print(fis.score)            # 0.0    — fraction-neutral rate (fn)
-print(fis.details["nn"])    # 0.008  — mean neutral probability mass
+print(fis.score)            # 0.0   : fraction-neutral rate (fn)
+print(fis.details["nn"])    # 0.008 : mean neutral probability mass
 
 eog = EqualOpportunityGap(g1="F", g2="M", positive_label=1).compute(
     None, GroupPredictions(y_true=y_true, y_pred=y_pred, groups=groups)
 )
-print(eog.score)                  # 0.5  — TPR gap
-print(eog.details["tpr_g1"])      # 0.5  — F
-print(eog.details["tpr_g2"])      # 0.0  — M
+print(eog.score)                  # 0.5 : TPR gap
+print(eog.details["tpr_g1"])      # 0.5 : F
+print(eog.details["tpr_g2"])      # 0.0 : M
 ```
 
 Real output of this snippet. The gap of 0.5 on four rows is an illustration of
-the mechanics, not a finding — `equal_opportunity_gap` is a difference of two
+the mechanics, not a finding; `equal_opportunity_gap` is a difference of two
 rates estimated from `n_g1=2` and `n_g2=2` here.
 
 ## BBQ-style disparity
@@ -93,8 +93,8 @@ bbq = [
 
 cbd = ContextBasedDisparityScore().compute(None, bbq)
 print(cbd.score)                       # 1.0
-print(cbd.details["s_dis"])            # 1.0  — disambiguated-context disparity
-print(cbd.details["s_amb"])            # 1.0  — ambiguous-context disparity
+print(cbd.details["s_dis"])            # 1.0 : disambiguated-context disparity
+print(cbd.details["s_amb"])            # 1.0 : ambiguous-context disparity
 print(cbd.details["accuracy_ambig"])   # 0.0
 ```
 
@@ -102,14 +102,14 @@ print(cbd.details["accuracy_ambig"])   # 0.0
 only chooses which one is reported as the headline `score`.
 
 `s_dis = 2 · (n_biased / n_non_unknown) − 1`, so it is signed on −1…1 with 0 at
-parity, and `s_amb = (1 − accuracy_ambig) · s_dis` — the same disparity scaled
+parity, and `s_amb = (1 − accuracy_ambig) · s_dis`, the same disparity scaled
 by how often the model fails to answer "unknown" when it should. Read them
 together with `accuracy_ambig`: a low `s_amb` can mean low bias *or* high
 ambiguous-context accuracy. A model that answers "unknown" to every
 disambiguated question leaves `n_non_unknown = 0` and both statistics come back
 `nan`, not `0.0`.
 
-The `BBQ` loader supplies the questions, not the outputs — you still run your
+The `BBQ` loader supplies the questions, not the outputs, so you still run your
 own task pipeline in between:
 
 ```python
@@ -128,7 +128,7 @@ BBQ files are bundled, so this runs offline.
 
 ## Choosing between the three
 
-`equal_opportunity_gap` is the general one — any binary task with group labels.
+`equal_opportunity_gap` is the general one, for any binary task with group labels.
 `fair_inference_score` is specific to NLI and asks a different question: whether
 the model retreats to *neutral* rather than whether it errs asymmetrically.
 `context_based_disparity` is specific to the BBQ two-context design and is the

@@ -6,10 +6,10 @@ no adapter layer to write.
 
 Two input styles work:
 
-1. **A sequence of mappings** — what the loaders return. Pair metrics want dicts
+1. **A sequence of mappings**, what the loaders return. Pair metrics want dicts
    with `stereotype` and `anti_stereotype` keys; a plain list of dicts is
    accepted directly.
-2. **A validated container** from `fairlms.metrics.data` — for metrics that need
+2. **A validated container** from `fairlms.metrics.data`, for metrics that need
    more structure than a flat sequence, such as the four role sets WEAT
    requires.
 
@@ -79,7 +79,7 @@ print(result.score, result.by_category)
 
 ## Worked example: predictions you already have
 
-Five metrics need no model at all — pass the predictions directly:
+Five metrics need no model at all, so pass the predictions directly:
 
 ```python
 from fairlms.metrics import EqualOpportunityGap

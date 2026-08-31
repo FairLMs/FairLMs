@@ -143,7 +143,7 @@ class NaturalIndirectEffect(FairnessMetric):
     ``prompt``, ``cf_text``, ``stereo_token_id`` and ``anti_token_id``.
 
     ``n_layers`` / ``n_heads`` / ``head_dim`` are derived from ``model.config``
-    when omitted — they used to be required arguments even though the model
+    when omitted; they used to be required arguments even though the model
     already knows them.
 
     Parameters

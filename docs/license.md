@@ -2,7 +2,7 @@
 
 FairLMs is released under the MIT License.
 
-This covers the library only. Each bundled or downloaded benchmark keeps its own license and citation requirements — see [Loaders](registry/loaders.md) and [Citing FairLMs](citation.md).
+This covers the library only. Each bundled or downloaded benchmark keeps its own license and citation requirements. See [Loaders](registry/loaders.md) and [Citing FairLMs](citation.md).
 
 ```text
 MIT License

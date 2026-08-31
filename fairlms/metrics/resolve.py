@@ -32,7 +32,7 @@ def check_task(loaded: Any, metric: Any) -> None:
 
     A metric declares ``required_task``; a :class:`~fairlms.models.LoadedModel`
     records the ``task`` it was loaded with. When both are known and disagree,
-    the metric would otherwise fail deep in its own numerics — with an
+    the metric would otherwise fail deep in its own numerics: with an
     ``AttributeError`` on a missing ``.logits``, or, worse, with plausible
     numbers read off a randomly initialized head. Fail here instead, naming
     both sides.
@@ -51,7 +51,7 @@ def check_task(loaded: Any, metric: Any) -> None:
     raise TypeError(
         f"{name} requires a model loaded with task={required!r}, got "
         f"task={actual!r}. Reload the checkpoint as "
-        f"HuggingFaceModel(name, task={required!r}) — the task selects which "
+        f"HuggingFaceModel(name, task={required!r}). The task selects which "
         f"head is attached, and this metric reads a quantity that "
         f"task={actual!r} does not expose."
     )
@@ -66,7 +66,7 @@ def get_tokenizer_model(
     """Return ``(tokenizer, model, device)`` from adapters or raw objects.
 
     Pass ``metric=self`` from a metric to have the model's ``task`` checked
-    against that metric's ``required_task`` — see :func:`check_task`.
+    against that metric's ``required_task``. See :func:`check_task`.
     """
     if model is None:
         raise TypeError("model is required for this metric")

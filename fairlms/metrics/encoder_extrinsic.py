@@ -1,6 +1,6 @@
 """Encoder-only extrinsic metrics: fair inference, equal opportunity, BBQ disparity.
 
-None of these three needs a model — they score predictions you already have — so
+None of these three needs a model; they score predictions you already have, so
 ``model`` is accepted and ignored for signature uniformity. Plain-function
 equivalents live in :mod:`fairlms.metrics.functional`, in the style of
 ``sklearn.metrics``.

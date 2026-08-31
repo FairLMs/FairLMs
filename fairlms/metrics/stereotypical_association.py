@@ -76,7 +76,7 @@ class CooccurrenceAssociation(FairnessMetric):
     concepts, a ``{concept}`` prompt template, and the group term lists counted
     in the generated text.
 
-    A score of ``nan`` means no group term appeared in any generation — raise
+    A score of ``nan`` means no group term appeared in any generation. Raise
     ``n_samples`` or widen the term lists (``details['n_skipped']`` reports how
     many concepts were skipped).
 

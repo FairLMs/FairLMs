@@ -21,7 +21,7 @@ See [Writing a metric](guides/custom-metric.md) for the full contract. In short:
    loading a checkpoint yourself.
 3. Add the class to `METRIC_REGISTRY` in `fairlms/metrics/__init__.py` and to
    `__all__`.
-4. Run the suite — the contract tests iterate over the registry, so
+4. Run the suite. The contract tests iterate over the registry, so
    registration alone earns the checks.
 
 ```bash
@@ -36,7 +36,7 @@ the public API. The wrapper in `fairlms/metrics/` is the stable surface;
 ## Adding a loader
 
 Subclass `FairnessDataset`, implement `load()`, and export the class from
-`fairlms/datasets/__init__.py` — the export list is what the generated
+`fairlms/datasets/__init__.py`. The export list is what the generated
 [Loaders](registry/loaders.md) page reads. Prefer Hub download over vendoring;
 only CrowS-Pairs and BBQ are bundled, and anything you add under
 `fairlms/data/` must also be declared in `[tool.setuptools.package-data]` or it
@@ -55,7 +55,7 @@ python scripts/gen_registry_docs.py    # regenerate registry tables
 mkdocs serve
 ```
 
-Registry pages are generated from the registries themselves — edit the code, not
+Registry pages are generated from the registries themselves, so edit the code, not
 the tables. CI runs `gen_registry_docs.py --check` and `mkdocs build --strict`,
 so a stale table or a broken link fails the build.
 

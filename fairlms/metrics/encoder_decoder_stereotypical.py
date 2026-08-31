@@ -28,7 +28,7 @@ class StereotypicalDivergence(FairnessMetric):
     The task is a French-translation cue test: the model is scored on whether it
     prefers a gendered (or age-marked) French continuation for each source
     sentence, and the two sets' accuracies are compared. ``labels`` must
-    therefore come from the scorer's own vocabulary — ``"male"`` / ``"female"``
+    therefore come from the scorer's own vocabulary: ``"male"`` / ``"female"``
     for the default, ``"young"`` / ``"old"`` for ``age_accuracy``.
 
     Parameters
@@ -67,7 +67,7 @@ class StereotypicalDivergence(FairnessMetric):
 
         Both built-in scorers return 0.5 for a gold label they do not
         recognise, so a wholly wrong label vocabulary yields a clean-looking
-        ``m_stereo == m_anti == 0.5`` and a divergence of exactly 0.0 — a
+        ``m_stereo == m_anti == 0.5`` and a divergence of exactly 0.0, a
         non-result indistinguishable from a real finding of parity. Individual
         unknown labels are still allowed through as chance, which is what 0.5
         is for; only a complete mismatch is an error.
@@ -173,7 +173,7 @@ class StereotypicalValueAttribution(FairnessMetric):
     attribute sets.
 
     The stereotype ``direction`` is derived from the sentences when not supplied,
-    which also guarantees it matches the model's hidden size — previously the
+    which also guarantees it matches the model's hidden size; previously the
     caller had to supply a correctly-sized vector by hand.
 
     Parameters

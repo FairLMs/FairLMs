@@ -31,7 +31,7 @@ triples = OccupationTriples(triples=[
 ])
 
 sll = StereotypicalLogLikelihood().compute(gpt2, triples)
-print(sll.score)      # 0.8855 — mean absolute gap across the three variants
+print(sll.score)      # 0.8855: mean absolute gap across the three variants
 print(sll.details)
 # {'NV': 1.1209, 'CV': 0.859, 'IV': 0.6765, 'n_occupations': 3}
 
@@ -46,7 +46,7 @@ spec = ConceptSpec(
 )
 
 ca = CooccurrenceAssociation(n_samples=4).compute(gpt2, spec)
-print(ca.score)                     # 0.05 — total-variation distance
+print(ca.score)                     # 0.05: total-variation distance
 print(ca.details["n_valid"])        # 2
 print(ca.details["n_skipped"])      # 0
 ```
@@ -67,7 +67,7 @@ if ca.score != ca.score:            # nan
     print("no group term appeared:", ca.details["n_skipped"], "concepts skipped")
 ```
 
-`nan` here is not a failure — it means no term from any group list appeared in
+`nan` here is not a failure; it means no term from any group list appeared in
 any sample. Raise `n_samples`, widen the term lists, or use a prompt template
 that invites a pronoun. `details["n_skipped"]` tells you how many concepts were
 dropped for this reason, so a score computed from two of twenty concepts is
@@ -75,8 +75,8 @@ visibly not a score over twenty.
 
 ## Attributing bias to heads
 
-The other two metrics are heavier and answer a mechanistic question — *which
-heads carry this bias* — rather than *how much bias is there*:
+The other two metrics are heavier and answer a mechanistic question, *which
+heads carry this bias*, rather than *how much bias is there*:
 
 ```python
 from fairlms.metrics import GradientBasedBiasEstimation, NaturalIndirectEffect
@@ -90,7 +90,7 @@ gbe = GradientBasedBiasEstimation().compute(gpt2, WordSets(
 ))
 
 print(gbe.score)                    # 0.49306
-print(gbe.details["shape"])         # (12, 12) — one value per (layer, head)
+print(gbe.details["shape"])         # (12, 12): one value per (layer, head)
 
 nie = NaturalIndirectEffect(threshold=0.003).compute(gpt2, ProbeSet(probes=[
     {
@@ -106,11 +106,11 @@ print(nie.details["threshold"])     # 0.003
 
 Both return the full `(n_layers, n_heads)` matrix in `details` alongside the
 headline score, so you can rank heads rather than only compare checkpoints. Get
-the token ids from the tokenizer rather than hardcoding them —
+the token ids from the tokenizer rather than hardcoding them:
 `tokenizer.encode(" she")` is `[673]` for `gpt2` but differs across
 vocabularies.
 
-Both sweep every layer and head, so cost scales with model depth — start with
+Both sweep every layer and head, so cost scales with model depth, so start with
 `gpt2` before `gpt2-medium`. `n_layers`, `n_heads` and `head_dim` are derived
 from `model.config` when omitted; pass them only to override. `GBE` accepts a
 precomputed `gbe_matrix` and `NIE` a precomputed `nie` array, so you can
@@ -119,7 +119,7 @@ re-score a saved sweep without re-running the model.
 ## Choosing between them
 
 `stereotypical_log_likelihood` is the cheapest and most directly comparable
-across checkpoints — one forward pass per template. `cooccurrence_association`
+across checkpoints, at one forward pass per template. `cooccurrence_association`
 measures the *generative* behaviour a user would actually encounter, which log
 probabilities can misrepresent, but it is sampled and therefore noisy: pin
 `n_samples` and report it. The two head-attribution metrics are diagnostic tools

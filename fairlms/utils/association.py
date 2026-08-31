@@ -47,7 +47,7 @@ def permutation_pval(s_T1, s_T2, n_samples=10_000, seed=None):
     ----------
     seed:
         Seed for the sampled branch. Drives a generator local to this call, so
-        the result depends on nothing but the arguments — callers do not have to
+        the result depends on nothing but the arguments, so callers do not have to
         reach for ``np.random.seed``, and one metric's sampling cannot be
         perturbed by unrelated global state. ``None`` draws from OS entropy.
         Ignored on the exact branch, which is deterministic by construction.

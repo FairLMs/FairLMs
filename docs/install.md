@@ -10,7 +10,7 @@ Requires Python 3.10 or later.
 
 | Extra | Command | Adds |
 |---|---|---|
-| `openai` | `pip install "fairlms[openai]"` | `openai` — API-served decoder wrappers |
+| `openai` | `pip install "fairlms[openai]"` | `openai`, for API-served decoder wrappers |
 | `dev` | `pip install "fairlms[dev]"` | `pytest`, `pytest-cov`, plus `openai` |
 | `all` | `pip install "fairlms[all]"` | `openai`, `dev`, `accelerate`, `sentencepiece`, `gender-guesser`, `tqdm` |
 | `docs` | `pip install "fairlms[docs]"` | `mkdocs-material`, `mkdocstrings[python]`, `mkdocs-jupyter` |
@@ -29,7 +29,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Prefer a tag over `main` when installing from source — `main` tracks unreleased
+Prefer a tag over `main` when installing from source. `main` tracks unreleased
 work, so any push can change behaviour under you.
 
 ## Verify the install

@@ -2,7 +2,7 @@
 
 Diagnostics audit the evaluation data and the scoring instrument directly,
 rather than inferring their quality from the scores a model happens to produce.
-They take explicit evidence plus a `DatasetAuditSpec` — never a model — and
+They take explicit evidence plus a `DatasetAuditSpec`, never a model, and
 return a `DiagnosticReport` whose components carry a status alongside any value.
 
 ## The four states
@@ -10,7 +10,7 @@ return a `DiagnosticReport` whose components carry a status alongside any value.
 | State | Meaning |
 |---|---|
 | `ready` | the component was computed |
-| `blocked` | a required input — evidence, reference or rule — was not supplied |
+| `blocked` | a required input (evidence, reference or rule) was not supplied |
 | `not_applicable` | the evidence cannot support this component |
 | `failed` | the computation raised |
 
@@ -168,7 +168,7 @@ There is no implicit threshold, direction or boundary rule anywhere.
 normalization. Mean, rate and W₁ gaps answer different questions, and none is a
 causal claim, a pass/fail rule or an error-rate metric. Paired sensitivity
 supports identity-isolated causal language only if the pairs really differ
-solely in the declared intervention — the package validates pair completeness
+solely in the declared intervention. The package validates pair completeness
 but cannot verify that semantic claim from scores alone.
 
 Treat each value as a per-dataset, per-scorer diagnostic (and rate gaps

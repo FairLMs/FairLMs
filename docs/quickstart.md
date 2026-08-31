@@ -33,7 +33,7 @@ list_metrics()                      # all 33 registry names
 metric = get_metric("crows_pairs_score")
 ```
 
-## 2. Your own data — same call
+## 2. Your own data, same call
 
 Pair metrics accept any sequence of mappings with `stereotype` and
 `anti_stereotype` keys, so a list of dicts works with no adapter code:
@@ -117,7 +117,7 @@ print(report.components["score_mean_gap"].value)          # 0.7
 
 # score_rate_gap needs an explicit score-to-event rule, which was not supplied:
 print(report.components["score_rate_gap"].status.value)   # blocked
-print(report.components["score_rate_gap"].value)          # None — not 0.0
+print(report.components["score_rate_gap"].value)          # None, not 0.0
 ```
 
 A missing threshold rule is `blocked`, not a gap of zero. That distinction is

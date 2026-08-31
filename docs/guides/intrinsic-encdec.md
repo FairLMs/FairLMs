@@ -28,12 +28,12 @@ t5 = HuggingFaceModel("t5-small", task="seq2seq")
 sentences = ["The nurse treated the patient.", "The engineer fixed the bridge."]
 
 lfp = LexicalFrequencyProportion(max_new_tokens=24).compute(t5, sentences)
-print(lfp.score)              # 0.5    — pb1
+print(lfp.score)              # 0.5   : pb1
 print(lfp.details["pb2"])     # 0.1667
 print(lfp.details["pb3"])     # 0.3333
 
 mcd = MorphologicalChoiceDivergence(max_new_tokens=24).compute(t5, sentences)
-print(mcd.score)              # 0.0    — mean_h
+print(mcd.score)              # 0.0   : mean_h
 print(mcd.details["mean_d"])  # 0.0
 
 # --- SD: paired labelled sets, measured by task performance -----------------
@@ -52,9 +52,9 @@ data = StereotypeLabelled(
 
 sd = StereotypicalDivergence(max_new_tokens=8).compute(t5, data)
 print(sd.score)                    # 0.0
-print(sd.details["m_stereo"])      # 0.5 — performance on the stereotype set
-print(sd.details["m_anti"])        # 0.5 — performance on the anti-stereotype set
-print(sd.details["delta_s"])       # 0.0 — the divergence
+print(sd.details["m_stereo"])      # 0.5: performance on the stereotype set
+print(sd.details["m_anti"])        # 0.5: performance on the anti-stereotype set
+print(sd.details["delta_s"])       # 0.0: the divergence
 ```
 
 Real output on `t5-small` with two sentences. `lfp` and `mcd` take a plain list
@@ -65,14 +65,14 @@ of strings, so a corpus is a list comprehension away; both `pb1`/`pb2`/`pb3` and
 ## Zero is a real value here, and so is a degenerate one
 
 `mcd.score == 0.0` on two sentences means the generated translations had
-identical morphological complexity — plausible for a two-sentence sample from a
+identical morphological complexity, which is plausible for a two-sentence sample from a
 60M-parameter model, and *not* the same as "no bias". Same for `sd.score == 0.0`
 with `m_stereo == m_anti == 0.5`: both sets scored equally, on one sentence
 each. These metrics need corpus-scale evidence before the numbers carry
 information; the snippet above shows the interface, not a result.
 
 `t5-small` in particular is a weak translator. Use `t5-base`, `google/mt5-base`
-or a task-specific checkpoint for anything you intend to report — the metrics
+or a task-specific checkpoint for anything you intend to report. The metrics
 measure the model's output, so a model that generates poorly produces
 uninformative scores rather than an error.
 
@@ -81,7 +81,7 @@ uninformative scores rather than an error.
 `stereotypical_divergence` scores whether the model prefers a gendered French
 continuation (`Il`/`Lui` vs `Elle`/`Celle-ci`) for each source sentence, and
 compares that accuracy between the stereotype and anti-stereotype sets. So
-`labels` must come from the scorer's own vocabulary — `"male"` / `"female"` by
+`labels` must come from the scorer's own vocabulary: `"male"` / `"female"` by
 default, `"young"` / `"old"` with `age_accuracy`.
 
 The scorers return 0.5 for a gold label they don't recognise, which is the right
@@ -114,7 +114,7 @@ from fairlms.definition.encoder_decoder.intrinsic_bias.stereotypical_association
 StereotypicalDivergence(metric_fn=age_accuracy)   # labels: "young" / "old"
 ```
 
-For anything else, supply both halves — your scorer and the routine that
+For anything else, supply both halves: your scorer and the routine that
 produces the labels it grades:
 
 ```python
@@ -131,13 +131,13 @@ StereotypicalDivergence(metric_fn=my_scorer, predict_fn=my_predictor)
 A custom `metric_fn` without a `predict_fn` raises `ValueError` naming both the
 built-ins and this escape hatch, rather than being silently mis-paired with the
 French gender predictor. Label-domain validation is skipped for a custom
-pairing — the vocabulary is then yours to define.
+pairing, since the vocabulary is then yours to define.
 
 ## Head attribution
 
 `stereotypical_value_attribution` is the mechanistic one, and its container is
 used unusually: `target_1` / `target_2` hold the stereotypical and
-anti-stereotypical **sentences**, and the attribute roles are ignored — pass the
+anti-stereotypical **sentences**, and the attribute roles are ignored, so pass the
 same sentences again if you have no attribute sets.
 
 ```python
@@ -161,5 +161,5 @@ have a precomputed unit vector of length `d_model`.
 None of these four has a bundled dataset. The leaf runners under
 `fairlms/definition/encoder_decoder/` pull sentences from XSum, Europarl,
 WinoBias and XNLI at runtime via `datasets.load_dataset`, which is worth knowing
-if you are working offline — the corpora are not vendored, only CrowS-Pairs and
+if you are working offline. The corpora are not vendored; only CrowS-Pairs and
 BBQ are.

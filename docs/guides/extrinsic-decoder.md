@@ -1,6 +1,6 @@
 # Extrinsic × decoder-only
 
-Seven metrics measure extrinsic bias in decoder-only models — bias in what the
+Seven metrics measure extrinsic bias in decoder-only models: bias in what the
 model *produces or gets wrong*, not in its internal geometry. This is the
 largest group, and it splits by what it needs from you:
 
@@ -8,7 +8,7 @@ largest group, and it splits by what it needs from you:
 |---|---|---|
 | `demographic_next_token_proportion` | `DemographicPrompts` | one forward pass, local model |
 | `demographic_representation_divergence` | `DemographicPrompts` | generation, local model |
-| `accuracy_disparity` | `ScorePair` | nothing — scores you already have |
+| `accuracy_disparity` | `ScorePair` | nothing; scores you already have |
 | `counterfactual_robustness` | `PromptPairs` | OpenAI API |
 | `counterfactual_fairness` | `PromptPairs` | OpenAI API |
 | `bias_amplifier` | `GroupProperties` | OpenAI API (`OPENAI_API_KEY`) |
@@ -40,9 +40,9 @@ prompts = DemographicPrompts(
 
 # --- DNP: next-token probability mass, normalised against a neutral baseline -
 dnp = DemographicNextTokenProportion().compute(gpt2, prompts)
-print(dnp.score)                  # 0.2746 — mean_pd
-print(dnp.details["mean_ps"])     # 0.437  — stereotype mass
-print(dnp.details["mean_psp"])    # 0.2884 — counter mass
+print(dnp.score)                  # 0.2746: mean_pd
+print(dnp.details["mean_ps"])     # 0.437 : stereotype mass
+print(dnp.details["mean_psp"])    # 0.2884: counter mass
 
 # --- DRD: the same prompts, but measured in free generations -----------------
 drd = DemographicRepresentationDivergence(max_new_tokens=12).compute(gpt2, prompts)
@@ -50,7 +50,7 @@ print(drd.score)                            # 0.5
 print(drd.details["n_stereotype_total"])    # 1
 print(drd.details["n_counter_total"])       # 0
 
-# --- AD: no model at all — audit scores you already produced ----------------
+# --- AD: no model at all: audit scores you already produced ----------------
 ad = AccuracyDisparity().compute(
     None, ScorePair(stereotype=[1, 1, 0, 1], counter_stereotype=[1, 0, 0, 0])
 )
@@ -59,7 +59,7 @@ print(ad.details["accuracy_stereotype"])     # 0.75
 print(ad.details["accuracy_counter"])        # 0.25
 ```
 
-Real output on `gpt2`. `neutral_words` is mandatory for DNP — the score is a
+Real output on `gpt2`. `neutral_words` is mandatory for DNP. The score is a
 *normalised* difference, and the metric raises rather than silently dropping the
 baseline if you omit it.
 
@@ -72,7 +72,7 @@ on `" she"` at position one and still produce balanced continuations, or the
 reverse.
 
 DRD is also sampled, so it is noisy at small `max_new_tokens` and small prompt
-counts — the `n_stereotype_total=1, n_counter_total=0` above is two prompts of
+counts; the `n_stereotype_total=1, n_counter_total=0` above is two prompts of
 twelve tokens each, which is an illustration of the plumbing and nothing more.
 Report `n_prompts` and `max_new_tokens` with any DRD number.
 
@@ -98,7 +98,7 @@ Install the extra (`pip install "fairlms[openai]"`) and set `OPENAI_API_KEY`.
 !!! warning "Legacy completions models"
     These metrics default to `davinci-002` and `gpt-3.5-turbo-instruct`, both
     legacy completions endpoints on a deprecation track. Pass `model_name=` /
-    `completion_model=` explicitly and record what you used — a result from a
+    `completion_model=` explicitly and record what you used. A result from a
     retired endpoint is not reproducible.
 
 `sensitive_name_similarity` takes neither: `model` must be a plain callable
@@ -127,5 +127,5 @@ deterministic, and it is the cheapest thing that will move when a model changes.
 Add `demographic_representation_divergence` when you care about generated text
 rather than token distributions, and budget for the variance. Use
 `accuracy_disparity` when you already have per-item correctness from a real
-task — it is the only metric here that measures harm on a task the model was
+task. It is the only metric here that measures harm on a task the model was
 actually deployed for.

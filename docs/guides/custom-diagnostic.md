@@ -56,7 +56,7 @@ class MyComponent(DatasetDiagnostic):
 layer:
 
 - a `ready` component **must** carry a finite numeric `value`;
-- any non-ready component **must** use `value=None` — passing a numeric
+- any non-ready component **must** use `value=None`; passing a numeric
   sentinel raises `ValueError` with the message *"a blocked component must use
   value=None, not a numeric sentinel"*;
 - any non-ready component **must** supply both `reason_code` and `reason`, so a
@@ -71,7 +71,7 @@ You cannot accidentally report unavailable evidence as `0.0`.
 | `READY` | inputs are sufficient and the value was computed |
 | `BLOCKED` | a required input was not supplied (a missing reference, a missing rule) |
 | `NOT_APPLICABLE` | the evidence is structurally incapable of supporting this component |
-| `FAILED` | computation raised — an execution status, illegal in a `plan` |
+| `FAILED` | computation raised; an execution status, illegal in a `plan` |
 
 `FAILED` is rejected by `ComponentPlan.__post_init__`: a plan describes
 applicability, not outcomes.

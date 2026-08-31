@@ -18,7 +18,7 @@ These are re-exports: the term lists under
 source of truth, and this module only shortens the import and wraps them in the
 container the metrics already expect. ``weat_*`` uses the term lists from
 Caliskan et al. (2017); ``seat_*`` uses the expanded name lists from May et al.
-(2019). Either works with either metric — the container is the same type.
+(2019). Either works with either metric; the container is the same type.
 
 CEAT is deliberately absent: it consumes :class:`ContextSets` (terms keyed to
 context sentences), not four flat lists, so there is nothing here to hand it.

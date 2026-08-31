@@ -1,6 +1,6 @@
 """Typed, validated input containers for metrics that need structured data.
 
-Metrics such as WEAT / SEAT / CEAT do not consume a flat corpus — they need
+Metrics such as WEAT / SEAT / CEAT do not consume a flat corpus; they need
 *four labelled sets* (two target groups, two attribute poles). Historically each
 metric accepted these through loose ``**kwargs`` (``T1_terms``, ``T1_vecs``,
 ``T1_contexts``, ``A_terms`` aliased to ``A1_terms``, …), which meant the
@@ -45,7 +45,7 @@ def _check_str_seq(value: Any, role: str) -> tuple:
     if isinstance(value, str) or not isinstance(value, (list, tuple, Sequence)):
         raise TypeError(
             f"{role} must be a sequence of strings, got {type(value).__name__}. "
-            f"(A bare string is not accepted — wrap it in a list.)"
+            f"(A bare string is not accepted. Wrap it in a list.)"
         )
     items = tuple(value)
     if not items:

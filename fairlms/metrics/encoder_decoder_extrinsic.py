@@ -79,8 +79,8 @@ class CounterfactualAucScore(FairnessMetric):
 
         The underlying ``compute_auc`` returns ``0.0`` when it cannot fit a
         probe, so that a caller can still inspect the rows. Read as a score,
-        though, ``0.0`` is the *most extreme possible finding* — a perfectly
-        anti-recoverable attribute — and it is indistinguishable from "there
+        though, ``0.0`` is the *most extreme possible finding*, a perfectly
+        anti-recoverable attribute, and it is indistinguishable from "there
         was nothing to fit". Every condition that triggers the short-circuit
         is decidable from the labels alone, so decide it here instead.
         """
@@ -312,7 +312,7 @@ class TranslationSimilarityScore(FairnessMetric):
     ----------
     labse_model, labse_tokenizer:
         The sentence encoder used to measure similarity of the two translations.
-        Required — there is no sensible default.
+        Required; there is no sensible default.
     tgt_lang:
         Target language name inserted into the translation prompt.
     max_new_tokens:

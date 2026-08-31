@@ -94,7 +94,7 @@ class CrowSPairsScore(_PairMetric):
     """Pseudo-log-likelihood CrowS-Pairs Score (Nangia et al., 2020).
 
     ``data`` yields dicts with ``stereotype``, ``anti_stereotype`` and
-    optionally ``bias_type`` — see :class:`~fairlms.datasets.CrowSPairs`.
+    optionally ``bias_type``. See :class:`~fairlms.datasets.CrowSPairs`.
 
     >>> CrowSPairsScore().compute(model, CrowSPairs(n_max=50))   # doctest: +SKIP
     """

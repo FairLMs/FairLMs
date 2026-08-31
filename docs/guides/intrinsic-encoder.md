@@ -1,6 +1,6 @@
 # Intrinsic × encoder-only
 
-Eleven metrics measure intrinsic bias in encoder-only models — bias read off the
+Eleven metrics measure intrinsic bias in encoder-only models: bias read off the
 model's own probabilities or representations, with no downstream task attached.
 
 They split into three families by what they read:
@@ -12,7 +12,7 @@ They split into three families by what they read:
 | Similarity | `weat`, `seat`, `ceat` | embedding geometry, no head at all |
 
 The first two families need `task="mlm"`; the similarity family needs
-`task="encoder"`. That is the only place the distinction matters — see
+`task="encoder"`. That is the only place the distinction matters. See
 [Models](../api/models.md).
 
 ## End to end
@@ -28,22 +28,22 @@ mlm = HuggingFaceModel("bert-base-uncased", task="mlm")
 pairs = CrowSPairs(n_max=20)
 
 cps = CrowSPairsScore().compute(mlm, pairs)
-print(cps.score)                      # 55.0  — % of pairs preferring the stereotype
+print(cps.score)                      # 55.0 : % of pairs preferring the stereotype
 print(cps.details["accuracy"])         # 65.43859649122807
 print(cps.by_category)
 # {'race-color': 50.0, 'socioeconomic': 0.0, 'gender': 66.7, 'disability': 100.0,
 #  'nationality': 50.0, 'sexual-orientation': 100.0, 'physical-appearance': 100.0}
 
-# The same evidence, a different scoring rule — no reloading, no reshaping:
+# The same evidence, a different scoring rule: no reloading, no reshaping:
 aul = AllUnmaskedLikelihoodScore().compute(mlm, pairs)
 print(aul.score)                      # 30.0
 
 # --- similarity metrics: bare encoder, bundled WEAT stimuli ------------------
 enc = HuggingFaceModel("bert-base-uncased", task="encoder")
 weat = WEAT(seed=0).compute(enc, weat_c1)
-print(weat.score)                     # 0.76   — Cohen's d effect size
-print(weat.details["p_value"])         # 0.0065 — permutation test
-print(weat.details["seed"])           # 0      — pinned, so this is reproducible
+print(weat.score)                     # 0.76  : Cohen's d effect size
+print(weat.details["p_value"])         # 0.0065: permutation test
+print(weat.details["seed"])           # 0     : pinned, so this is reproducible
 ```
 
 Values above are the real output of this snippet on `bert-base-uncased` with 20
@@ -55,13 +55,13 @@ anything you intend to report.
 `crows_pairs_score` and the AUL family both report *the percentage of pairs
 where the stereotypical sentence scores higher*, so 50 is parity and above 50
 favours the stereotype. They disagree here (55.0 vs 30.0) because they score
-sentences differently — CPS masks and scores only the tokens that differ between
+sentences differently: CPS masks and scores only the tokens that differ between
 the pair, AUL scores every token unmasked in one pass. That disagreement is the
 point of implementing both; neither is a corrected version of the other.
 
 `weat` reports Cohen's *d*, where 0 is no differential association and the
 conventional large-effect threshold is 0.8. Always report `seed` alongside
-`p_value` — the p-value comes from a 10,000-sample permutation test, and with
+`p_value`. The p-value comes from a 10,000-sample permutation test, and with
 `seed=None` (the default) it is not reproducible.
 
 ## Swapping the checkpoint
@@ -86,5 +86,5 @@ for ckpt in ("bert-base-uncased", "roberta-base", "distilbert-base-uncased"):
 `CrowSPairs` is bundled, so the example above runs offline. `StereoSet`
 (`as_triples=True`) supplies the `SentenceTriples` that
 `context_association_test` wants, and any list of dicts with `stereotype` /
-`anti_stereotype` keys works directly — see
+`anti_stereotype` keys works directly. See
 [Bring your own data](own-data.md).

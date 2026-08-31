@@ -47,7 +47,7 @@ class FairnessMetric(ABC):
     architectures: Tuple[str, ...] = ()
 
     #: The ``task`` a Hugging Face checkpoint must be loaded with for this
-    #: metric to read the quantity it is defined on — one of ``mlm``,
+    #: metric to read the quantity it is defined on: one of ``mlm``,
     #: ``encoder``, ``sequence_classification``, ``seq2seq``, ``causal``.
     #: Checked by :func:`fairlms.metrics.resolve.check_task` when the metric
     #: resolves a model. ``None`` means the metric imposes no requirement:
@@ -81,7 +81,7 @@ class FairnessMetric(ABC):
         ----------
         deep:
             When ``True``, also report the parameters of any nested object that
-            exposes ``get_params``, under ``name__subname`` keys — sklearn's
+            exposes ``get_params``, under ``name__subname`` keys, which is sklearn's
             convention. Accepting this argument is what lets sklearn utilities
             (which always pass ``deep``) operate on these metrics.
         """
