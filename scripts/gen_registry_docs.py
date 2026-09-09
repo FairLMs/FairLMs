@@ -180,10 +180,80 @@ def diagnostics_page() -> str:
     )
 
 
+#: Ordered as the book chapter presents the intervention categories.
+_CATEGORY_BLURB = {
+    "pre": "Applied to the data before training. Transform evidence, not models.",
+    "in": "Loss components composable with a normal training loop. These return "
+    "a callable objective, never a trained model: there is no trainer in the "
+    "core package.",
+    "intra": "Edits to a loaded model. Each returns a `ModelAdapter`, so any "
+    "metric re-evaluates the mitigated model without modification.",
+    "post": "Decision rules fitted on outputs. Serializable, and applied "
+    "without the model that produced the scores.",
+}
+
+
+def mitigation_page() -> str:
+    from fairlms.mitigation import MITIGATOR_REGISTRY
+
+    sections = []
+    for category, blurb in _CATEGORY_BLURB.items():
+        rows = []
+        for name, cls in sorted(MITIGATOR_REGISTRY.items()):
+            if cls.category != category:
+                continue
+            rows.append(
+                "| `{name}` | `{cls}` | {access} | {arch} | {req} | {acc} |".format(
+                    name=name,
+                    cls=cls.__name__,
+                    access=f"`{cls.access}`",
+                    arch=_fmt(sorted(cls.architectures)),
+                    req=_fmt(sorted(cls.requires)) if cls.requires else "-",
+                    acc=_fmt(sorted(t.__name__ for t in cls.accepts)),
+                )
+            )
+        sections.append(
+            f"## {category.capitalize()}-processing\n\n{blurb}\n\n"
+            "| Component | Class | Access | Architectures | Requires | Accepts |\n"
+            "|---|---|---|---|---|---|\n" + "\n".join(rows) + "\n"
+        )
+
+    return (
+        HEADER
+        + "# Mitigators\n\n"
+        + f"{len(MITIGATOR_REGISTRY)} registered components. Each declares an "
+        "intervention category, an access level, supported architectures, the "
+        "capabilities it needs from a model, and the evidence containers it "
+        "consumes. Applicability is decided from those declarations by the same "
+        "matcher the metrics use, and an unsatisfiable pairing is refused by "
+        "name.\n\n"
+        "Access levels are ordered `black_box` < `gray_box` < `white_box`; a "
+        "component declares the **minimum** it needs.\n\n"
+        + "\n".join(sections)
+        + "\n## Not provided\n\n"
+        "Named in the paper as extension points and deliberately absent from "
+        "this registry: RLHF, DPO, Constitutional AI and other "
+        "preference-optimized training loops; UniDetox; the "
+        "influence-estimation half of IF-Guide; GeDi, RAD, DExperts, FairSteer, "
+        "ARGRE and other guided-decoding methods; LSDM; FairMed; "
+        "gender-constrained beam search; model-based rewriting.\n\n"
+        "Named in the book chapter but not provided here, recorded so that a "
+        "reader comparing the two does not mistake omission for oversight: "
+        "conceptor debiasing; pruning and ablation; the no-attribute "
+        "(name-proxy) setting; Co2PT; BiasUnlearn; data filtering and toxicity "
+        "removal; dataset curation and balanced collection; output filtering "
+        "and safety classification; refusal policies and content moderation; "
+        "counterfactual data *substitution*. The book's bias diagnosis and data "
+        "auditing family is covered, but by the "
+        "[diagnostics](diagnostics.md) layer.\n"
+    )
+
+
 PAGES = {
     "metrics.md": metrics_page,
     "loaders.md": loaders_page,
     "diagnostics.md": diagnostics_page,
+    "mitigation.md": mitigation_page,
 }
 
 

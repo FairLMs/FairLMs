@@ -30,6 +30,8 @@ class AccuracyDisparity(FairnessMetric):
     name = "accuracy_disparity"
     bias_type = "extrinsic"
     architectures = ("decoder_only",)
+    requires = frozenset(set())
+    accepts = (ScorePair,)
 
     def compute(
         self, model: Any = None, data: Any = None, **legacy: Any
@@ -88,6 +90,8 @@ class BiasAmplifierScore(FairnessMetric):
     name = "bias_amplifier"
     bias_type = "extrinsic"
     architectures = ("decoder_only",)
+    requires = frozenset({"token_logprobs"})
+    accepts = (GroupProperties,)
 
     def __init__(self, *, completion_model: str = "davinci-002"):
         self.completion_model = completion_model
@@ -162,6 +166,8 @@ class SensitiveNameSimilarity(FairnessMetric):
     name = "sensitive_name_similarity"
     bias_type = "extrinsic"
     architectures = ("decoder_only",)
+    requires = frozenset({"free_generation"})
+    accepts = (QuerySpec,)
 
     def __init__(self, *, k: int = 5):
         self.k = k

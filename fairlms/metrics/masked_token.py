@@ -16,7 +16,7 @@ from fairlms.definition.encoder_only.intrinsic_bias.probability_based.masked_tok
 )
 from fairlms.metrics._compat import as_examples, take, unwrap, warn_legacy
 from fairlms.metrics.base import FairnessMetric, MetricResult
-from fairlms.metrics.data import ContrastSpec, GroupWordPairs
+from fairlms.metrics.data import ContrastSpec, GroupWordPairs, RECORD_CORPUS
 from fairlms.metrics.resolve import get_tokenizer_model
 
 
@@ -42,6 +42,8 @@ class DiscoveryOfCorrelationsScore(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "mlm"
+    requires = frozenset({"masked_token_scores"})
+    accepts = (GroupWordPairs,)
 
     def __init__(
         self,
@@ -162,6 +164,8 @@ class LogProbabilityBiasScore(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "mlm"
+    requires = frozenset({"masked_token_scores"})
+    accepts = RECORD_CORPUS
 
     def __init__(
         self,
@@ -269,6 +273,8 @@ class ContrastBasedScore(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "mlm"
+    requires = frozenset({"masked_token_scores"})
+    accepts = (ContrastSpec,)
 
     def __init__(
         self,

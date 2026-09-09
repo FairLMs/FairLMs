@@ -6,8 +6,17 @@ from typing import Any, List, Optional, Sequence, Tuple
 
 import torch
 
+from fairlms.applicability import check_applicability
 from fairlms.models.base import LoadedModel, ModelAdapter
 from fairlms.models.openai import OpenAILoadedModel, OpenAIModel
+
+
+#: The heads :class:`~fairlms.models.HuggingFaceModel` can attach to a local
+#: checkpoint. A ``task`` outside this set (``openai``) is a different kind of
+#: deployment, not a different head.
+LOCAL_TASKS = frozenset(
+    {"mlm", "encoder", "sequence_classification", "seq2seq", "causal"}
+)
 
 
 def get_examples(dataset: Any) -> Optional[List[Any]]:
@@ -40,12 +49,20 @@ def check_task(loaded: Any, metric: Any) -> None:
     Silent when either side is unknown: raw ``(tokenizer, model)`` tuples carry
     no task, and metrics that work on any head leave ``required_task`` as
     ``None``.
+
+    Also silent when the model is not a locally loaded checkpoint at all. This
+    check is about *which head is attached*, and "reload with a different head"
+    is the wrong advice for an API-served model that has no head to choose. That
+    case is refused by :func:`check_model_applicability`, which can name the
+    quantity the deployment cannot produce.
     """
     required = getattr(metric, "required_task", None)
     if required is None:
         return
     actual = getattr(loaded, "task", None)
     if actual is None or actual == required:
+        return
+    if actual not in LOCAL_TASKS:
         return
     name = type(metric).__name__ if not isinstance(metric, str) else metric
     raise TypeError(
@@ -55,6 +72,22 @@ def check_task(loaded: Any, metric: Any) -> None:
         f"head is attached, and this metric reads a quantity that "
         f"task={actual!r} does not expose."
     )
+
+
+def check_model_applicability(model: Any, metric: Any) -> None:
+    """Refuse a model that cannot produce what *metric* declared it reads.
+
+    ``check_task`` catches the wrong head on a local checkpoint. This catches
+    the broader case the paper names: a deployment that cannot expose the
+    quantity at all, such as an API-served decoder asked for ``hidden_states``.
+    Evidence is checked by each metric against its own ``data``, so only the
+    model side is matched here.
+
+    Silent whenever either side is unknown, exactly as :func:`check_task` is.
+    """
+    if metric is None:
+        return
+    check_applicability(metric, model)
 
 
 def get_tokenizer_model(
@@ -72,12 +105,18 @@ def get_tokenizer_model(
         raise TypeError("model is required for this metric")
 
     if isinstance(model, ModelAdapter):
+        # Both matched against the adapter before load(): a refusal is only
+        # worth anything if it lands before the weights are pulled. Adapters
+        # already carry the `task` tag both checks read.
+        check_task(model, metric)
+        check_model_applicability(model, metric)
         loaded = model.load()
         check_task(loaded, metric)
         return loaded.tokenizer, loaded.model, loaded.device
 
     if isinstance(model, LoadedModel):
         check_task(model, metric)
+        check_model_applicability(model, metric)
         return model.tokenizer, model.model, model.device
 
     if isinstance(model, (tuple, list)) and len(model) >= 2:

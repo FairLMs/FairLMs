@@ -9,7 +9,12 @@ from .base import (
     DiagnosticStatus,
     ReportStatus,
 )
-from .evidence import PairedScores, RepresentationEvidence, ScoredGroups
+from .evidence import (
+    LabeledScoredGroups,
+    PairedScores,
+    RepresentationEvidence,
+    ScoredGroups,
+)
 from .registry import DIAGNOSTIC_REGISTRY, get_diagnostic, list_diagnostics
 from .representativeness import (
     RepresentativenessBias,
@@ -42,6 +47,7 @@ __all__ = [
     "DesignStance",
     "DiagnosticReport",
     "DiagnosticStatus",
+    "LabeledScoredGroups",
     "PairedScores",
     "ReferenceDistribution",
     "ReferencePurpose",

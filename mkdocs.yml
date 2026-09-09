@@ -71,17 +71,21 @@ nav:
       - Preparing audit evidence: preparing_audit_evidence.md
       - Preparing representativeness evidence: preparing_representativeness_evidence.md
       - Writing a metric: guides/custom-metric.md
+      - Mitigating bias: guides/mitigation.md
       - Writing a diagnostic: guides/custom-diagnostic.md
   - Registry:
       - Metrics: registry/metrics.md
       - Loaders: registry/loaders.md
       - Diagnostics: registry/diagnostics.md
+      - Mitigators: registry/mitigation.md
       - Divergences from released runners: registry/divergences.md
   - API reference:
       - Metrics: api/metrics.md
       - Models: api/models.md
       - Containers: api/containers.md
       - Diagnostics: api/diagnostics.md
+      - Mitigation: api/mitigation.md
+      - Applicability: api/applicability.md
       - Loaders: api/loaders.md
       - Utils: api/utils.md
   - About:

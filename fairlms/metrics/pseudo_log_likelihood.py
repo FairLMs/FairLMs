@@ -34,7 +34,7 @@ from fairlms.metrics._compat import (
     warn_legacy,
 )
 from fairlms.metrics.base import FairnessMetric, MetricResult
-from fairlms.metrics.data import SentenceTriples
+from fairlms.metrics.data import RECORD_CORPUS, SentenceTriples
 from fairlms.metrics.resolve import get_tokenizer_model
 
 _PAIR_KEYS = ("stereotype", "anti_stereotype")
@@ -101,6 +101,8 @@ class CrowSPairsScore(_PairMetric):
 
     name = "crows_pairs_score"
     required_task = "mlm"
+    requires = frozenset({"masked_token_scores"})
+    accepts = RECORD_CORPUS
     _compute_fn = staticmethod(compute_cps)
 
 
@@ -109,6 +111,8 @@ class PseudoLogLikelihoodScore(_PairMetric):
 
     name = "pseudo_log_likelihood_score"
     required_task = "mlm"
+    requires = frozenset({"masked_token_scores"})
+    accepts = RECORD_CORPUS
     _compute_fn = staticmethod(compute_pll)
 
 
@@ -124,6 +128,8 @@ class AllUnmaskedLikelihoodScore(_PairMetric):
 
     name = "all_unmasked_likelihood_score"
     required_task = "mlm"
+    requires = frozenset({"masked_token_scores"})
+    accepts = RECORD_CORPUS
     _compute_fn = staticmethod(compute_aul)
     _extra_allowed = ("use_attention",)
 
@@ -139,6 +145,8 @@ class AllUnmaskedLikelihoodAttentionScore(_PairMetric):
 
     name = "all_unmasked_likelihood_attention_score"
     required_task = "mlm"
+    requires = frozenset({"masked_token_scores", "attentions"})
+    accepts = RECORD_CORPUS
     _compute_fn = staticmethod(compute_aula)
     _extra_allowed = ("use_attention",)
 
@@ -160,6 +168,8 @@ class ContextAssociationTestScore(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "mlm"
+    requires = frozenset({"masked_token_scores"})
+    accepts = (SentenceTriples,)
 
     def compute(
         self,

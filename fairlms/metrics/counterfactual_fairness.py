@@ -70,6 +70,8 @@ class CounterfactualRobustness(_PromptPairMetric):
     """
 
     name = "counterfactual_robustness"
+    requires = frozenset({"free_generation"})
+    accepts = (PromptPairs,)
 
     def compute(
         self, model: Any = None, data: Any = None, **legacy: Any
@@ -96,6 +98,8 @@ class CounterfactualFairnessScore(_PromptPairMetric):
     """
 
     name = "counterfactual_fairness"
+    requires = frozenset({"token_logprobs"})
+    accepts = (PromptPairs,)
 
     def compute(
         self, model: Any = None, data: Any = None, **legacy: Any

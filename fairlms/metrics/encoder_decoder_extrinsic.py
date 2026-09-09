@@ -20,7 +20,7 @@ from fairlms.definition.encoder_decoder.extrinsic_bias.position_based.npd import
 )
 from fairlms.metrics._compat import as_examples, take, unwrap, warn_legacy
 from fairlms.metrics.base import FairnessMetric, MetricResult
-from fairlms.metrics.data import LabeledSentences
+from fairlms.metrics.data import LabeledSentences, RECORD_CORPUS
 from fairlms.metrics.resolve import get_tokenizer_model
 
 
@@ -67,6 +67,8 @@ class CounterfactualAucScore(FairnessMetric):
     bias_type = "extrinsic"
     architectures = ("encoder_decoder",)
     required_task = "seq2seq"
+    requires = frozenset({"hidden_states"})
+    accepts = (LabeledSentences,)
 
     def __init__(self, *, test_ratio: float = 0.2, seed: int = 42, n_seeds: int = 10):
         self.test_ratio = test_ratio
@@ -203,6 +205,8 @@ class InferenceBiasScore(FairnessMetric):
     name = "inference_bias_score"
     bias_type = "extrinsic"
     architectures = ("encoder_decoder",)
+    requires = frozenset(set())
+    accepts = RECORD_CORPUS
 
     def compute(
         self, model: Any = None, data: Any = None, **legacy: Any
@@ -253,6 +257,8 @@ class NormalizedPositionDistance(FairnessMetric):
     bias_type = "extrinsic"
     architectures = ("encoder_decoder",)
     required_task = "seq2seq"
+    requires = frozenset({"free_generation"})
+    accepts = RECORD_CORPUS
 
     def __init__(
         self,
@@ -323,6 +329,8 @@ class TranslationSimilarityScore(FairnessMetric):
     bias_type = "extrinsic"
     architectures = ("encoder_decoder",)
     required_task = "seq2seq"
+    requires = frozenset({"free_generation"})
+    accepts = RECORD_CORPUS
 
     def __init__(
         self,
