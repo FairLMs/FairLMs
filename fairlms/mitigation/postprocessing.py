@@ -250,6 +250,16 @@ class GroupAwareThresholding(Mitigator):
     Reports the residual gap it actually achieved: with finite data the rates
     rarely match exactly, and rounding that away would overstate the result.
 
+    **Equalising the rates is not sufficient on its own.** Two operating points
+    equalise every rate perfectly and are useless: rejecting everyone (all rates
+    zero) and accepting everyone (all rates one). A search that minimises only
+    the gap finds one of them and reports a perfect score, because a gap of zero
+    is exactly what it was asked for. Among the points that tie on the gap this
+    therefore maximises Youden's J, ``mean(TPR) - mean(FPR)``, which is zero for
+    both degenerate points and positive for any genuinely discriminating rule.
+    The achieved value is reported as ``achieved_utility`` and the rule is
+    recorded in provenance, so the trade-off stays visible rather than implied.
+
     Parameters
     ----------
     criterion:
@@ -319,22 +329,37 @@ class GroupAwareThresholding(Mitigator):
         for target_tpr in targets:
             chosen = {}
             for group in groups:
+                # Closest to the shared target TPR, then the *lowest* FPR among
+                # the points that reach it. Several thresholds usually deliver
+                # the same TPR; picking by threshold alone would silently take
+                # the one that also admits the most false positives.
                 chosen[group] = min(
-                    options[group], key=lambda p: (abs(p[1] - target_tpr), p[0])
+                    options[group],
+                    key=lambda p: (abs(p[1] - target_tpr), p[2], p[0]),
                 )
             tprs = [chosen[g][1] for g in groups]
             fprs = [chosen[g][2] for g in groups]
             tpr_gap = max(tprs) - min(tprs)
             fpr_gap = max(fprs) - min(fprs)
             cost = tpr_gap + (fpr_gap if self.criterion == "equalized_odds" else 0.0)
-            if best is None or cost < best["cost"] - 1e-12:
+            utility = (sum(tprs) - sum(fprs)) / len(groups)
+            # Minimise the gap first, then break ties on utility. Rounding keeps
+            # float noise from deciding the ordering; the thresholds themselves
+            # are the final tie-break so the result is deterministic.
+            key = (
+                round(cost, 12),
+                -round(utility, 12),
+                tuple(chosen[g][0] for g in groups),
+            )
+            if best is None or key < best["key"]:
                 best = {
-                    "cost": cost,
+                    "key": key,
                     "thresholds": {g: chosen[g][0] for g in groups},
                     "tpr": {g: chosen[g][1] for g in groups},
                     "fpr": {g: chosen[g][2] for g in groups},
                     "tpr_gap": tpr_gap,
                     "fpr_gap": fpr_gap,
+                    "utility": utility,
                 }
 
         assert best is not None  # at least two groups are guaranteed upstream
@@ -346,11 +371,16 @@ class GroupAwareThresholding(Mitigator):
                 "fpr": best["fpr"],
                 "achieved_tpr_gap": best["tpr_gap"],
                 "achieved_fpr_gap": best["fpr_gap"],
+                "achieved_utility": best["utility"],
                 "positive_label": evidence.positive_label,
             },
             axis=evidence.axis,
             n_rows=evidence.n_rows,
             groups=groups,
+            selection_rule=(
+                "minimise the rate gap, then maximise Youden's J "
+                "(mean TPR - mean FPR) among the operating points that tie"
+            ),
         )
 
     @staticmethod

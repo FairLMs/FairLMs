@@ -34,6 +34,15 @@ SEPARABLE = _evidence(
     labels=["no", "no", "yes", "yes", "no", "no", "yes", "yes"],
 )
 
+#: 'm' scores are shifted up by 0.5 relative to 'f'. Both groups separate their
+#: own classes perfectly, so the correct per-group thresholds are recoverable
+#: exactly and the expected answer can be asserted rather than approximated.
+SHIFTED = _evidence(
+    groups=["f"] * 4 + ["m"] * 4,
+    scores=[0.1, 0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9],
+    labels=["no", "no", "yes", "yes", "no", "no", "yes", "yes"],
+)
+
 
 class TestScoreCalibration:
     def test_fits_one_rule_per_group(self):
@@ -116,14 +125,48 @@ class TestGroupAwareThresholding:
     def test_equal_opportunity_closes_the_tpr_gap_on_shifted_scores(self):
         # 'm' scores are shifted up by 0.5; a single global threshold would
         # advantage them. Per-group thresholds should recover equal TPR.
-        evidence = _evidence(
-            groups=["f"] * 4 + ["m"] * 4,
-            scores=[0.1, 0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9],
-            labels=["no", "no", "yes", "yes", "no", "no", "yes", "yes"],
-        )
-        rule = GroupAwareThresholding().apply(None, evidence).result
+        rule = GroupAwareThresholding().apply(None, SHIFTED).result
         assert rule["achieved_tpr_gap"] == pytest.approx(0.0)
         assert rule["thresholds"]["f"] != rule["thresholds"]["m"]
+        # Closing the gap is not enough on its own: assert the rule is also
+        # useful, or "reject everyone" would satisfy the line above.
+        assert all(tpr > 0.0 for tpr in rule["tpr"].values())
+
+    def test_the_shift_is_recovered_exactly(self):
+        # Known value. The shift is 0.5 and both groups separate perfectly, so
+        # the correct per-group thresholds admit every positive and no negative.
+        rule = GroupAwareThresholding().apply(None, SHIFTED).result
+        assert rule["thresholds"] == {"f": 0.3, "m": 0.8}
+        assert rule["tpr"] == {"f": 1.0, "m": 1.0}
+        assert rule["fpr"] == {"f": 0.0, "m": 0.0}
+
+    @pytest.mark.parametrize("criterion", ["equal_opportunity", "equalized_odds"])
+    def test_the_degenerate_equalizers_are_not_returned(self, criterion):
+        """Rejecting or accepting everyone equalises every rate, uselessly.
+
+        Both have a gap of exactly zero, so a search that minimises only the
+        gap terminates on one of them and reports a perfect score. This is the
+        regression guard for that: a real bug, caught by a documented example
+        that printed thresholds above every observed score.
+        """
+        rule = GroupAwareThresholding(criterion).apply(None, SHIFTED).result
+        rates = list(rule["tpr"].values()) + list(rule["fpr"].values())
+        assert not all(r == 0.0 for r in rates), "returned the reject-all rule"
+        assert not all(r == 1.0 for r in rates), "returned the accept-all rule"
+        # Youden's J is 0 for both degenerate points and positive otherwise.
+        assert rule["achieved_utility"] > 0.0
+
+    def test_no_threshold_sits_outside_the_observed_scores(self):
+        # A threshold above every score selects nobody; below every score
+        # selects everybody. Either means the search escaped the useful range.
+        rule = GroupAwareThresholding().apply(None, SHIFTED).result
+        for group, scores, _ in SHIFTED.iter_groups():
+            assert min(scores) <= rule["thresholds"][group] <= max(scores)
+
+    def test_utility_is_reported_and_the_rule_is_recorded(self):
+        outcome = GroupAwareThresholding().apply(None, SHIFTED)
+        assert outcome.result["achieved_utility"] == pytest.approx(1.0)
+        assert "Youden" in outcome.provenance["selection_rule"]
 
     def test_reports_the_gap_it_actually_achieved(self):
         rule = GroupAwareThresholding().apply(None, SEPARABLE).result

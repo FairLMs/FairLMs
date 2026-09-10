@@ -94,12 +94,22 @@ evidence = LabeledScoredGroups(
 rule = GroupAwareThresholding().apply(None, evidence).result
 rule["thresholds"]         # {'f': 0.3, 'm': 0.8}
 rule["achieved_tpr_gap"]   # 0.0
+rule["achieved_utility"]   # 1.0
 ```
 
 `positive_label` is required because equal opportunity is defined as an equal
 true-positive rate *for the positive class*: which label is positive is part of
 the question, not a property of the data. The rule also reports the gap it
 **actually achieved**, since with finite data the rates rarely match exactly.
+
+`achieved_utility` is reported alongside it because a closed gap is not on its
+own evidence of a good rule. Rejecting every candidate equalises every rate
+perfectly, and so does accepting every candidate; both score a gap of zero.
+`GroupAwareThresholding` therefore minimises the gap first and then maximises
+Youden's J, `mean(TPR) - mean(FPR)`, which is zero for both of those degenerate
+rules and positive for any rule that actually discriminates. Read the two
+numbers together: a gap of `0.0` with a utility of `0.0` means the search
+equalised the rates by refusing to decide anything.
 
 !!! note
     `LabeledScoredGroups` presumes a **binary** label. Under multi-class labels
