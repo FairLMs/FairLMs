@@ -13,12 +13,16 @@ a ``matmul`` shape error deep inside numpy.
 
 from __future__ import annotations
 
+import collections.abc
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
+from fairlms.datasets.base import FairnessDataset
+
 __all__ = [
+    "RECORD_CORPUS",
     "WordSets",
     "VectorSets",
     "ContextSets",
@@ -37,6 +41,13 @@ __all__ = [
     "QuerySpec",
     "GroupProperties",
 ]
+
+#: What a corpus metric declares in ``accepts``. Not every metric consumes a
+#: purpose-built container: several score a plain corpus of records, which
+#: reaches them either as a :class:`~fairlms.datasets.FairnessDataset` or as an
+#: already-materialised sequence of examples. Declaring both is what those
+#: metrics actually take; narrowing it to one would be a false declaration.
+RECORD_CORPUS: Tuple[type, ...] = (FairnessDataset, collections.abc.Sequence)
 
 _ROLES = ("target_1", "target_2", "attribute_1", "attribute_2")
 

@@ -19,6 +19,7 @@ from fairlms.metrics import (
     get_metric,
     list_metrics,
 )
+from fairlms.mitigation import MITIGATOR_REGISTRY
 
 ALL_METRICS = list_metrics()
 
@@ -229,3 +230,51 @@ def test_get_metric_unknown_name_lists_alternatives():
     with pytest.raises(KeyError) as excinfo:
         get_metric("not_a_metric")
     assert "weat" in str(excinfo.value)
+
+
+# ---------------------------------------------------------------------------
+# Declaration conformance
+# ---------------------------------------------------------------------------
+# Every component declares the model capabilities and evidence it needs, so it
+# runs against whatever satisfies them and is refused otherwise. Without a check
+# here the safe empty defaults quietly become permanent, and the claim would be
+# false for the 33 metrics even while it held for the mitigators.
+
+
+@pytest.mark.parametrize("name,cls", sorted(METRIC_REGISTRY.items()))
+def test_metric_declares_requirements(name, cls):
+    assert cls.accepts, f"{name} declares no evidence containers"
+    assert cls.architectures, f"{name} declares no architectures"
+    # `requires` may legitimately be empty for a metric that reads no model
+    # output, but it must be explicitly set on the class, not inherited.
+    assert "requires" in vars(cls), f"{name} does not declare requires"
+
+
+@pytest.mark.parametrize("name,cls", sorted(METRIC_REGISTRY.items()))
+def test_metric_declaration_uses_the_public_vocabulary(name, cls):
+    from fairlms.applicability import validate_declaration
+
+    validate_declaration(cls)
+
+
+@pytest.mark.parametrize("name,cls", sorted(MITIGATOR_REGISTRY.items()))
+def test_mitigator_declares_requirements(name, cls):
+    """The same conformance, over the mitigators."""
+    assert cls.accepts, f"{name} declares no evidence containers"
+    assert cls.architectures, f"{name} declares no architectures"
+    assert "requires" in vars(cls), f"{name} does not declare requires"
+    assert cls.category, f"{name} declares no intervention category"
+    assert cls.access, f"{name} declares no access level"
+
+
+@pytest.mark.parametrize("name,cls", sorted(MITIGATOR_REGISTRY.items()))
+def test_mitigator_follows_the_parameter_protocol(name, cls):
+    """Mitigators are sklearn-style estimators too."""
+    mitigator = cls()
+    for param in cls._param_names():
+        assert hasattr(mitigator, param), (
+            f"{name}: __init__ parameter {param!r} is not stored as "
+            f"self.{param}, so get_params() cannot see it"
+        )
+    params = mitigator.get_params(deep=False)
+    assert type(mitigator)(**params).get_params(deep=False) == params

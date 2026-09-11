@@ -18,6 +18,7 @@ from fairlms.definition.encoder_decoder.intrinsic_bias.algorithmic_disparity.mcd
 from fairlms.metrics._compat import as_examples, take, unwrap, warn_legacy
 from fairlms.metrics.base import FairnessMetric, MetricResult
 from fairlms.metrics.resolve import get_tokenizer_model
+from fairlms.metrics.data import RECORD_CORPUS
 
 
 def _sentences(data: Any, metric: str) -> List[str]:
@@ -75,6 +76,8 @@ class LexicalFrequencyProportion(_TranslationCorpusMetric):
 
     name = "lexical_frequency_proportion"
     required_task = "seq2seq"
+    requires = frozenset({"free_generation"})
+    accepts = RECORD_CORPUS
 
     def compute(
         self,
@@ -112,6 +115,8 @@ class MorphologicalChoiceDivergence(_TranslationCorpusMetric):
 
     name = "morphological_choice_divergence"
     required_task = "seq2seq"
+    requires = frozenset({"free_generation"})
+    accepts = RECORD_CORPUS
 
     def compute(
         self,

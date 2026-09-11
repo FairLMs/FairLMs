@@ -49,6 +49,8 @@ class StereotypicalDivergence(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_decoder",)
     required_task = "seq2seq"
+    requires = frozenset({"token_logprobs"})
+    accepts = (StereotypeLabelled,)
 
     def __init__(
         self,
@@ -192,6 +194,8 @@ class StereotypicalValueAttribution(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_decoder",)
     required_task = "seq2seq"
+    requires = frozenset({"hidden_states", "attentions"})
+    accepts = (WordSets,)
 
     def __init__(
         self,

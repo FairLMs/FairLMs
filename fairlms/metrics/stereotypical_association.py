@@ -32,6 +32,8 @@ class StereotypicalLogLikelihood(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("decoder_only",)
     required_task = "causal"
+    requires = frozenset({"token_logprobs"})
+    accepts = (OccupationTriples,)
 
     def compute(
         self,
@@ -90,6 +92,8 @@ class CooccurrenceAssociation(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("decoder_only",)
     required_task = "causal"
+    requires = frozenset({"free_generation"})
+    accepts = (ConceptSpec,)
 
     def __init__(self, *, n_samples: int = 20):
         self.n_samples = n_samples

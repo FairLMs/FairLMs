@@ -22,7 +22,7 @@ from fairlms.definition.encoder_only.extrinsic_bias.fair_inference.fair_inferenc
 )
 from fairlms.metrics._compat import as_examples, require_mapping_keys, take, unwrap, warn_legacy
 from fairlms.metrics.base import FairnessMetric, MetricResult
-from fairlms.metrics.data import GroupPredictions
+from fairlms.metrics.data import GroupPredictions, RECORD_CORPUS
 
 
 class FairInferenceScore(FairnessMetric):
@@ -36,6 +36,8 @@ class FairInferenceScore(FairnessMetric):
     name = "fair_inference_score"
     bias_type = "extrinsic"
     architectures = ("encoder_only",)
+    requires = frozenset(set())
+    accepts = RECORD_CORPUS
 
     def compute(
         self, model: Any = None, data: Any = None, **legacy: Any
@@ -81,6 +83,8 @@ class EqualOpportunityGap(FairnessMetric):
     name = "equal_opportunity_gap"
     bias_type = "extrinsic"
     architectures = ("encoder_only",)
+    requires = frozenset(set())
+    accepts = (GroupPredictions,)
 
     def __init__(
         self, *, g1: Any = None, g2: Any = None, positive_label: Any = 1
@@ -171,6 +175,8 @@ class ContextBasedDisparityScore(FairnessMetric):
     name = "context_based_disparity"
     bias_type = "extrinsic"
     architectures = ("encoder_only",)
+    requires = frozenset(set())
+    accepts = RECORD_CORPUS
 
     def __init__(self, *, score: str = "s_dis"):
         # Validation lives in compute(), not __init__, per the sklearn contract:

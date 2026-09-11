@@ -25,6 +25,12 @@ class OpenAIModel(ModelAdapter):
     Reads ``OPENAI_API_KEY`` from the environment when ``api_key`` is omitted.
     """
 
+    #: Mirrors :attr:`OpenAILoadedModel.task` so applicability can be decided
+    #: before the client is constructed. An API-served decoder exposes text and
+    #: nothing else, which is what makes it refuse activation-based components.
+    #: See :data:`fairlms.applicability.TASK_PROFILES`.
+    task: str = "openai"
+
     def __init__(
         self,
         model_name: str = "davinci-002",

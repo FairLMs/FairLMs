@@ -840,6 +840,155 @@ class ScoredGroups:
 
 
 @dataclass(frozen=True, kw_only=True)
+class LabeledScoredGroups:
+    """Scored group rows plus the outcome label each row was scored against.
+
+    Composes :class:`ScoredGroups` rather than widening it. ``ScoredGroups``
+    froze its contract with the explicit rule that labels and pair geometry do
+    not widen the type, so the group/score half of the validation - finite
+    scores, equal row counts, at least two observed groups, declared score range
+    - is inherited here for free instead of being duplicated or relaxed.
+
+    This is what the group-fairness post-processing methods need: a threshold or
+    a calibrator is fitted against *outcomes*, not against scores alone.
+
+    ``positive_label`` is mandatory and never inferred. Equal opportunity is
+    defined as an equal true-positive rate **for the positive class**, so which
+    label is positive is part of the question being asked, not a property of the
+    data. This matches the rest of the library, which never infers a protected
+    attribute, a role or a threshold.
+
+    .. note::
+       ``positive_label`` presumes a **binary** label. Under multi-class labels
+       equal opportunity is defined per class, and this type does not model
+       that. Ship binary, and do not pretend otherwise.
+
+    Examples
+    --------
+    >>> from fairlms.diagnostics import LabeledScoredGroups, ScoredGroups
+    >>> evidence = LabeledScoredGroups(
+    ...     scored=ScoredGroups(
+    ...         axis="gender",
+    ...         groups=["f", "f", "m", "m"],
+    ...         scores=[0.9, 0.2, 0.8, 0.1],
+    ...         score_name="p_hire",
+    ...         source="unit-test",
+    ...         score_range=[0.0, 1.0],
+    ...     ),
+    ...     labels=["hired", "not_hired", "hired", "not_hired"],
+    ...     label_name="outcome",
+    ...     positive_label="hired",
+    ... )
+    >>> evidence.n_rows
+    4
+    >>> tuple(group for group, _, _ in evidence.iter_groups())
+    ('f', 'm')
+    """
+
+    scored: ScoredGroups
+    labels: Sequence[str]
+    label_name: str
+    positive_label: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.scored, ScoredGroups):
+            raise TypeError(
+                "scored must be a ScoredGroups, got "
+                f"{type(self.scored).__name__}."
+            )
+        object.__setattr__(
+            self,
+            "label_name",
+            require_nonempty_string(self.label_name, "label_name"),
+        )
+        object.__setattr__(
+            self,
+            "positive_label",
+            require_nonempty_string(self.positive_label, "positive_label"),
+        )
+        labels = normalize_string_sequence(
+            self.labels,
+            field_name="labels",
+            allow_empty=False,
+        )
+        if len(labels) != len(self.scored.scores):
+            raise ValueError(
+                "labels and scores must contain the same number of rows; got "
+                f"{len(labels)} labels and {len(self.scored.scores)} scores."
+            )
+        observed = set(labels)
+        if len(observed) < 2:
+            raise ValueError(
+                "labels must contain at least two distinct outcomes; got only "
+                f"{sorted(observed)!r}. A single outcome cannot define a rate."
+            )
+        if self.positive_label not in observed:
+            raise ValueError(
+                f"positive_label {self.positive_label!r} does not occur in labels; "
+                f"observed labels are {sorted(observed)!r}."
+            )
+        object.__setattr__(self, "labels", labels)
+
+    # -- convenience views over the composed evidence -----------------------
+    @property
+    def axis(self) -> str:
+        """The protected axis, from the composed :class:`ScoredGroups`."""
+        return self.scored.axis
+
+    @property
+    def groups(self) -> tuple:
+        """Per-row group membership."""
+        return tuple(self.scored.groups)
+
+    @property
+    def scores(self) -> tuple:
+        """Per-row scores."""
+        return tuple(self.scored.scores)
+
+    @property
+    def support(self) -> tuple:
+        """Sorted observed group support."""
+        return self.scored.support
+
+    @property
+    def label_support(self) -> tuple:
+        """Sorted observed label support."""
+        return tuple(sorted(set(self.labels)))
+
+    @property
+    def n_rows(self) -> int:
+        """Number of labelled, scored rows."""
+        return len(self.labels)
+
+    def positives(self) -> tuple:
+        """Per-row indicator of membership in the declared positive class."""
+        return tuple(label == self.positive_label for label in self.labels)
+
+    def iter_groups(self):
+        """Yield ``(group, scores, positives)`` per group, in sorted order.
+
+        Groups are emitted in sorted order so a fitted rule is deterministic.
+        """
+        for group in self.support:
+            rows = [i for i, g in enumerate(self.groups) if g == group]
+            yield (
+                group,
+                tuple(self.scores[i] for i in rows),
+                tuple(self.labels[i] == self.positive_label for i in rows),
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a new JSON-safe representation."""
+        return {
+            "scored": self.scored.to_dict(),
+            "labels": list(self.labels),
+            "label_name": self.label_name,
+            "positive_label": self.positive_label,
+            "label_support": list(self.label_support),
+        }
+
+
+@dataclass(frozen=True, kw_only=True)
 class PairedScores:
     """Finite scores for complete two-condition counterfactual pairs."""
 
@@ -3094,6 +3243,7 @@ __all__ = [
     "AssociationCounts",
     "DatasetEvidence",
     "GroupedTexts",
+    "LabeledScoredGroups",
     "LeakageExtractionRecord",
     "OptionItems",
     "PairedScores",

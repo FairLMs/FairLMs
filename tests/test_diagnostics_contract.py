@@ -38,6 +38,10 @@ from fairlms.metrics import METRIC_REGISTRY
 PUBLIC_NAMES = {
     "DIAGNOSTIC_SCHEMA_VERSION",
     "DiagnosticStatus",
+    # Composes ScoredGroups with an outcome label. Lives here rather than in
+    # fairlms.mitigation because it composes a diagnostics type and both layers
+    # use it: it is what the deferred label-membership rate transform needs.
+    "LabeledScoredGroups",
     "PairedScores",
     "ReportStatus",
     "ComponentPlan",
