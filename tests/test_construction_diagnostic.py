@@ -380,7 +380,7 @@ def test_backend_slots_are_blocked_with_a_reason_naming_the_backend():
         assert result.details["slot"] == slot
         assert result.details["required_backend"] == requirement["required_backend"]
         assert result.details["required_protocol"] == protocol
-        assert result.details["required_extra"] == "fairlms[construction-backends]"
+        assert result.details["availability"] == "not_implemented_in_this_release"
         assert result.details["milestone"] == "P2C-06"
         assert result.provenance["backend_requirement"] == dict(requirement)
 
@@ -1433,3 +1433,52 @@ def test_golden_mixed_construction_vector_fixture_is_portable_and_replays():
         if expected["status"] != "ready":
             assert expected["value"] is None, slot
             assert payload["components"][slot]["value"] is None, slot
+
+
+# --- regression: a blocked slot must not advertise something that does not exist
+
+
+def test_backend_protocols_are_real_types():
+    """The refusal metadata names a protocol; that name must resolve.
+
+    A blocked slot is an extension point only if a caller can see what to
+    implement. Citing `EmbeddingBackend` while defining no such type made the
+    reason metadata unactionable.
+    """
+    # Imported from the module, not the package surface: D032 keeps
+    # unimplemented machinery off the public API, so these stay internal until
+    # P2C-06 gives them an injection point.
+    from fairlms.diagnostics import CONSTRUCTION_BACKEND_REQUIREMENTS
+    from fairlms.diagnostics.construction import (
+        DependencyParserBackend,
+        EmbeddingBackend,
+        GrammarCheckerBackend,
+    )
+
+    named = {EmbeddingBackend, GrammarCheckerBackend, DependencyParserBackend}
+    by_name = {cls.__name__: cls for cls in named}
+    for slot, requirement in CONSTRUCTION_BACKEND_REQUIREMENTS.items():
+        assert requirement["required_protocol"] in by_name, slot
+
+
+def test_blocked_slots_do_not_advertise_an_install_that_does_not_exist():
+    """`required_extra` pointed at fairlms[construction-backends], which is not
+    declared in pyproject.toml. Telling a user to install a nonexistent extra is
+    worse than telling them the backend is not implemented yet."""
+    import tomllib
+    from pathlib import Path
+
+    from fairlms.diagnostics import CONSTRUCTION_BACKEND_REQUIREMENTS
+
+    root = Path(__file__).resolve().parents[1]
+    declared = set(
+        tomllib.loads((root / "pyproject.toml").read_text())
+        .get("project", {})
+        .get("optional-dependencies", {})
+    )
+    for slot, requirement in CONSTRUCTION_BACKEND_REQUIREMENTS.items():
+        extra = requirement.get("required_extra")
+        if extra is not None:
+            name = extra.partition("[")[2].rstrip("]")
+            assert name in declared, f"{slot} advertises undeclared extra {extra!r}"
+        assert requirement["availability"] == "not_implemented_in_this_release"

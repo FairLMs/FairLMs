@@ -33,7 +33,9 @@ from typing import (
     Final,
     Mapping,
     Optional,
+    Protocol,
     Sequence,
+    runtime_checkable,
 )
 
 from fairlms.diagnostics._kernels import max_pairwise_gap, token_levenshtein
@@ -94,6 +96,50 @@ BACKEND_CONSTRUCTION_SLOTS: Final[tuple[str, ...]] = (
     "b_diff_dep",
 )
 
+# ---------------------------------------------------------------------------
+# Optional backend protocols
+# ---------------------------------------------------------------------------
+# The three backend-dependent slots are blocked in this release. These protocols
+# exist so the names the refusal metadata cites are real types a caller can
+# implement against, and so a future backend has a contract to satisfy rather
+# than one invented at integration time. Nothing here imports a model, a parser
+# or a checker: they are structural types, checked at type-check time only.
+
+
+@runtime_checkable
+class EmbeddingBackend(Protocol):
+    """Sentence embeddings for the ``b_equiv`` semantic-equivalence slot."""
+
+    #: Identifies the model and revision that produced the vectors. Recorded in
+    #: provenance, because a similarity is only comparable against itself.
+    revision: str
+
+    def encode(self, texts: Sequence[str]) -> Sequence[Sequence[float]]:
+        """Return one fixed-width vector per text, in the order given."""
+
+
+@runtime_checkable
+class GrammarCheckerBackend(Protocol):
+    """Grammatical-error counts for the ``b_gram`` slot."""
+
+    #: Checker name, version and language, recorded in provenance.
+    revision: str
+
+    def count_errors(self, texts: Sequence[str]) -> Sequence[int]:
+        """Return the number of flagged errors per text, in the order given."""
+
+
+@runtime_checkable
+class DependencyParserBackend(Protocol):
+    """Dependency depth for the ``b_diff_dep`` slot."""
+
+    #: Parser name, model and version, recorded in provenance.
+    revision: str
+
+    def depths(self, texts: Sequence[str]) -> Sequence[int]:
+        """Return the dependency-tree depth per text, in the order given."""
+
+
 CONSTRUCTION_BACKEND_REQUIREMENTS: Final[Mapping[str, Mapping[str, str]]] = (
     MappingProxyType(
         {
@@ -102,7 +148,7 @@ CONSTRUCTION_BACKEND_REQUIREMENTS: Final[Mapping[str, Mapping[str, str]]] = (
                     "reason_code": "embedding_backend_unavailable",
                     "required_backend": "sentence_embedding",
                     "required_protocol": "EmbeddingBackend",
-                    "required_extra": "fairlms[construction-backends]",
+                    "availability": "not_implemented_in_this_release",
                     "required_view": "paired_texts",
                     "milestone": "P2C-06",
                 }
@@ -112,7 +158,7 @@ CONSTRUCTION_BACKEND_REQUIREMENTS: Final[Mapping[str, Mapping[str, str]]] = (
                     "reason_code": "grammar_backend_unavailable",
                     "required_backend": "grammar_checker",
                     "required_protocol": "GrammarCheckerBackend",
-                    "required_extra": "fairlms[construction-backends]",
+                    "availability": "not_implemented_in_this_release",
                     "required_view": "paired_texts",
                     "milestone": "P2C-06",
                 }
@@ -122,7 +168,7 @@ CONSTRUCTION_BACKEND_REQUIREMENTS: Final[Mapping[str, Mapping[str, str]]] = (
                     "reason_code": "dependency_parser_backend_unavailable",
                     "required_backend": "dependency_parser",
                     "required_protocol": "DependencyParserBackend",
-                    "required_extra": "fairlms[construction-backends]",
+                    "availability": "not_implemented_in_this_release",
                     "required_view": "grouped_texts",
                     "milestone": "P2C-06",
                 }
@@ -1897,7 +1943,7 @@ def _backend_slot_result(
             "slot": slot,
             "required_backend": requirement["required_backend"],
             "required_protocol": requirement["required_protocol"],
-            "required_extra": requirement["required_extra"],
+            "availability": requirement["availability"],
             "milestone": requirement["milestone"],
         },
         provenance=provenance,
