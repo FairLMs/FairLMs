@@ -518,7 +518,7 @@ def test_registry_exports_default_wasserstein_component_and_schema_is_strict_jso
     assert COMPONENT in list_diagnostics()
     assert isinstance(diagnostic, ScorerWasserstein1Gap)
     assert diagnostic == ScorerWasserstein1Gap()
-    assert payload["schema_version"] == "1.4"
+    assert payload["schema_version"] == "1.7"
     assert math.isfinite(payload["components"][COMPONENT]["value"])
     assert report.to_json(indent=None) == report.to_json(indent=None)
     json.dumps(payload, allow_nan=False, sort_keys=True)

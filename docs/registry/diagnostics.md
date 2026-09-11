@@ -2,14 +2,34 @@
 
 # Diagnostics
 
-5 registered components. Each reports one of `ready`, `blocked`, `not_applicable`, `failed`. Unavailable evidence is never reported as a measured zero.
+11 registered components. Each reports one of `ready`, `blocked`, `not_applicable`, `failed`. Unavailable evidence is never reported as a measured zero.
 
-Diagnostics consume explicit evidence objects and a `DatasetAuditSpec`, never a model. Run them through `audit_representativeness` or `audit_scores`.
+Diagnostics consume explicit evidence objects and a `DatasetAuditSpec`, never a model. Run one component through `audit_representativeness`, `audit_leakage` or `audit_scores`, the construction vector through `audit_construction`, and several evidence views at once through `audit_dataset`.
+
+Every registered diagnostic constructs with zero arguments, which is what `get_diagnostic(name)` needs. Several of them then report `blocked` for their own missing configuration -- `b_min` without an identity mask, `b_opt` without an option-role contrast, `b_frame` without a frame predicate, `b_leak` on raw text without an extraction configuration. That is the designed answer, not a defect: each of those settings is part of the estimand and is never inferred.
 
 | Component | Class | Evidence | Description |
 |---|---|---|---|
+| `b_diff_len` | `LengthDisparity` | `GroupedTexts` | Maximum pairwise group mean-length gap over the sample-weighted mean. |
+| `b_frame` | `FramingDisparity` | `GroupedTexts` | Maximum pairwise gap in the per-group rate of a declared frame. |
+| `b_leak` | `StereotypeLeakage` | `AssociationCounts \| TextEvidence` | Smoothed normalized mutual information between group and trait terms. |
+| `b_min` | `MinimalPairResidual` | `PairedTexts` | Mean normalized token edit distance between identity-masked pair sides. |
+| `b_opt` | `OptionLengthBias` | `OptionItems` | Mean signed option-length difference between two declared roles. |
 | `b_rep` | `RepresentativenessBias` | `RepresentationEvidence` | Smoothed KL divergence between observed and reference composition. |
+| `b_temp` | `TemplateImbalance` | `TemplateGroups` | Unique-template count imbalance across declared groups, with coverage. |
 | `score_counterfactual_sensitivity` | `ScorerCounterfactualSensitivity` | `PairedScores` | Mean absolute score change within complete two-condition pairs. |
 | `score_mean_gap` | `ScorerMeanGap` | `ScoredGroups` | Maximum absolute pairwise difference between group mean scores. |
 | `score_rate_gap` | `ScorerRateGap` | `ScoredGroups` | Maximum absolute pairwise difference between group event rates. |
 | `score_wasserstein_1_gap` | `ScorerWasserstein1Gap` | `ScoredGroups` | Maximum pairwise empirical one-dimensional Wasserstein distance. |
+
+## Construction slots
+
+`b_constr` is published as a vector of 8 independent components in the fixed order `b_min`, `b_equiv`, `b_gram`, `b_diff_len`, `b_diff_dep`, `b_frame`, `b_opt`, `b_temp`, never as an aggregate score. `construction_vector(report)` returns them in that order, since a report alphabetizes its components.
+
+The 3 slots below depend on an optional backend that this release does not ship. They have no registered class by design: `audit_construction` and `audit_dataset` synthesize a result for each of them instead of registering a stub. The backend is checked **last**, after the precedence every component shares, so a backend slot is `blocked` with the reason code below only when it was requested *and* its required evidence view is present for the audited axis. Otherwise it reports the same non-ready outcome any other component would: `not_applicable` / `component_not_requested`, `not_applicable` / `evidence_view_not_supplied`, `not_applicable` / `target_kind_not_supported`, or whatever a caller override declares. Status alone therefore does not identify a backend slot -- `BACKEND_CONSTRUCTION_SLOTS` and `CONSTRUCTION_BACKEND_REQUIREMENTS` do. A missing backend blocks only its own slot and never the rest of the vector.
+
+| Slot | Required backend | Required view | Reason code | Install extra | Milestone |
+|---|---|---|---|---|---|
+| `b_equiv` | `EmbeddingBackend` | `paired_texts` | `embedding_backend_unavailable` | `fairlms[construction-backends]` | P2C-06 |
+| `b_gram` | `GrammarCheckerBackend` | `paired_texts` | `grammar_backend_unavailable` | `fairlms[construction-backends]` | P2C-06 |
+| `b_diff_dep` | `DependencyParserBackend` | `grouped_texts` | `dependency_parser_backend_unavailable` | `fairlms[construction-backends]` | P2C-06 |

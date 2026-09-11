@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from collections.abc import Sequence
 from enum import Enum
@@ -101,6 +103,22 @@ def freeze_json_mapping(value: Any, *, path: str) -> Mapping[str, Any]:
     frozen = freeze_json(value, path=path)
     assert isinstance(frozen, Mapping)
     return frozen
+
+
+def json_digest(payload: Any, *, path: str = "digest_payload") -> str:
+    """Return the sha256 hex digest of a canonical JSON encoding of *payload*.
+
+    Non-JSON-safe payloads are rejected by :func:`freeze_json`, so a digest can
+    never silently cover a stringified object.
+    """
+    text = json.dumps(
+        thaw_json(freeze_json(payload, path=path)),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def thaw_json(value: Any) -> Any:

@@ -159,11 +159,32 @@ def diagnostics_page() -> str:
         evidence = inspect.signature(cls.compute).parameters.get("evidence")
         ann = getattr(evidence, "annotation", None)
         ann = ann if isinstance(ann, str) else getattr(ann, "__name__", "n/a")
+        # A union annotation contains a pipe, which would end the table cell.
+        ann = ann.replace("|", "\\|")
         rows.append(
             "| `{name}` | `{cls}` | `{ev}` | {summary} |".format(
                 name=name, cls=cls.__name__, ev=ann, summary=_summary(cls)
             )
         )
+
+    from fairlms.diagnostics import (
+        BACKEND_CONSTRUCTION_SLOTS,
+        CONSTRUCTION_BACKEND_REQUIREMENTS,
+        CONSTRUCTION_SLOTS,
+    )
+
+    backend_rows = [
+        "| `{slot}` | {backend} | `{view}` | `{code}` | `{extra}` | {milestone} |".format(
+            slot=slot,
+            backend=f"`{CONSTRUCTION_BACKEND_REQUIREMENTS[slot]['required_protocol']}`",
+            view=CONSTRUCTION_BACKEND_REQUIREMENTS[slot]["required_view"],
+            code=CONSTRUCTION_BACKEND_REQUIREMENTS[slot]["reason_code"],
+            extra=CONSTRUCTION_BACKEND_REQUIREMENTS[slot]["required_extra"],
+            milestone=CONSTRUCTION_BACKEND_REQUIREMENTS[slot]["milestone"],
+        )
+        for slot in CONSTRUCTION_SLOTS
+        if slot in BACKEND_CONSTRUCTION_SLOTS
+    ]
 
     return (
         HEADER
@@ -172,11 +193,46 @@ def diagnostics_page() -> str:
         "`blocked`, `not_applicable`, `failed`. Unavailable evidence is never "
         "reported as a measured zero.\n\n"
         "Diagnostics consume explicit evidence objects and a "
-        "`DatasetAuditSpec`, never a model. Run them through "
-        "`audit_representativeness` or `audit_scores`.\n\n"
+        "`DatasetAuditSpec`, never a model. Run one component through "
+        "`audit_representativeness`, `audit_leakage` or `audit_scores`, the "
+        "construction vector through `audit_construction`, and several "
+        "evidence views at once through `audit_dataset`.\n\n"
+        "Every registered diagnostic constructs with zero arguments, which is "
+        "what `get_diagnostic(name)` needs. Several of them then report "
+        "`blocked` for their own missing configuration -- `b_min` without an "
+        "identity mask, `b_opt` without an option-role contrast, `b_frame` "
+        "without a frame predicate, `b_leak` on raw text without an "
+        "extraction configuration. That is the designed answer, not a "
+        "defect: each of those settings is part of the estimand and is never "
+        "inferred.\n\n"
         "| Component | Class | Evidence | Description |\n|---|---|---|---|\n"
         + "\n".join(rows)
-        + "\n"
+        + "\n\n"
+        + "## Construction slots\n\n"
+        + "`b_constr` is published as a vector of "
+        f"{len(CONSTRUCTION_SLOTS)} independent components in the fixed order "
+        + ", ".join(f"`{slot}`" for slot in CONSTRUCTION_SLOTS)
+        + ", never as an aggregate score. `construction_vector(report)` "
+        "returns them in that order, since a report alphabetizes its "
+        "components.\n\n"
+        + f"The {len(backend_rows)} slots below depend on an optional backend "
+        "that this release does not ship. They have no registered class by "
+        "design: `audit_construction` and `audit_dataset` synthesize a result "
+        "for each of them instead of registering a stub. The backend is "
+        "checked **last**, after the precedence every component shares, so a "
+        "backend slot is `blocked` with the reason code below only when it "
+        "was requested *and* its required evidence view is present for the "
+        "audited axis. Otherwise it reports the same non-ready outcome any "
+        "other component would: `not_applicable` / `component_not_requested`, "
+        "`not_applicable` / `evidence_view_not_supplied`, `not_applicable` / "
+        "`target_kind_not_supported`, or whatever a caller override declares. "
+        "Status alone therefore does not identify a backend slot -- "
+        "`BACKEND_CONSTRUCTION_SLOTS` and `CONSTRUCTION_BACKEND_REQUIREMENTS` "
+        "do. A missing backend blocks only its own slot and never the rest of "
+        "the vector.\n\n"
+        "| Slot | Required backend | Required view | Reason code | "
+        "Install extra | Milestone |\n"
+        "|---|---|---|---|---|---|\n" + "\n".join(backend_rows) + "\n"
     )
 
 
