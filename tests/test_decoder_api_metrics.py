@@ -255,15 +255,41 @@ class TestBiasAmplifierScore:
         )
         assert result.details["rb"] == pytest.approx(0.0)
 
-    def test_an_unanswerable_prompt_is_a_tie_and_a_disagreement(self):
-        """Every candidate scoring ``-inf`` means the model gave nothing usable."""
+    def test_an_unanswerable_prompt_is_not_scored_as_a_tie(self):
+        """Every candidate scoring ``-inf`` means the model gave nothing usable.
+
+        This test previously asserted the opposite: that "nothing usable" was
+        recorded as a tie for absolute bias and as a disagreement for relative
+        bias. Scoring a non-observation as an observation is what let a dead API
+        key average out to ``ab == 0.5``, the value a perfectly unbiased model
+        produces, and to ``rb == 0.0``, the value a perfectly consistent one
+        produces. Both are fabrications.
+
+        The expectation was changed because it contradicted the library's own
+        contract. ``DiagnosticStatus.NOT_APPLICABLE`` exists so that unavailable
+        evidence is never serialized as a computed zero; a metric that turns an
+        unanswered prompt into a number breaks the same rule the diagnostics
+        layer is built to enforce. A genuine tie, meaning two finite and equal
+        scores, is untouched and still reported as a tie.
+        """
         client = StubOpenAIClient(token_score_fn=lambda word, prompt: float("-inf"))
+        with pytest.raises(RuntimeError, match="never answered"):
+            BiasAmplifierScore().compute(
+                client,
+                GroupProperties(["men", "women"], ["strong"], AB_TEMPLATE, RB_TEMPLATE),
+            )
+
+    def test_a_partially_answerable_run_still_reports_what_was_observed(self):
+        """One dead comparison must not discard the comparisons that worked."""
+        dead_for_women = lambda word, prompt: (
+            float("-inf") if "women" in prompt and "Is " in prompt else 0.0
+        )
+        client = StubOpenAIClient(token_score_fn=dead_for_women)
         result = BiasAmplifierScore().compute(
             client,
             GroupProperties(["men", "women"], ["strong"], AB_TEMPLATE, RB_TEMPLATE),
         )
-        assert result.details["ab_rows"][0]["favours"] == "tie"
-        assert all(row["agreed"] == 0.0 for row in result.details["rb_rows"])
+        assert result.details["ab"] is not None
 
     def test_completion_model_is_forwarded(self):
         """``completion_model`` previously had no effect on the requests."""
