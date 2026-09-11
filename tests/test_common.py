@@ -278,3 +278,32 @@ def test_mitigator_follows_the_parameter_protocol(name, cls):
         )
     params = mitigator.get_params(deep=False)
     assert type(mitigator)(**params).get_params(deep=False) == params
+
+
+def test_discovery_of_correlations_reaches_its_declaration_check():
+    """Regression: _as_pipeline was a staticmethod that referenced ``self``.
+
+    Every path that built a pipeline from a plain masked LM raised
+    ``NameError: name 'self' is not defined`` before the metric's own
+    ``requires``/``required_task`` declarations could be consulted, so the
+    applicability contract was unreachable for this metric.
+    """
+    from fairlms.metrics.data import GroupWordPairs
+    from fairlms.models.base import LoadedModel
+
+    metric = METRIC_REGISTRY["discovery_of_correlations"]()
+    evidence = GroupWordPairs(["he", "man"], ["she", "woman"])
+
+    class _NotAModel:
+        pass
+
+    loaded = LoadedModel(
+        name="stub",
+        tokenizer=object(),
+        model=_NotAModel(),
+        device="cpu",
+        task="mlm",
+    )
+    with pytest.raises(Exception) as excinfo:
+        metric.compute(loaded, evidence)
+    assert not isinstance(excinfo.value, NameError), excinfo.value

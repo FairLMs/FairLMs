@@ -137,17 +137,43 @@ def compare_before_after(
             f"{', '.join(sorted(METRIC_REGISTRY))}"
         )
 
-    fairness = []
-    for name in sorted(metrics):
-        cls = METRIC_REGISTRY[name]
-        metric, evidence = cls(), metrics[name]
-        before = after = None
-        error = None
+    # Every "before" is measured before any "after".
+    #
+    # An intra-processing adapter edits the model it wraps in place: it installs
+    # a forward hook on the very ``nn.Module`` the base adapter caches. Scoring
+    # one metric all the way through (before, then after) leaves that hook
+    # attached, so the next metric's "before" would be read from the already
+    # mitigated model and its delta would silently collapse to zero. Phasing the
+    # loops keeps every baseline honest without requiring the mitigated adapter
+    # to be reversible.
+    metric_names = sorted(metrics)
+    baselines: dict[str, tuple[Optional[float], Optional[str]]] = {}
+    for name in metric_names:
         try:
-            before = float(metric.compute(base_model, evidence))
-            after = float(metric.compute(mitigated_model, evidence))
+            baselines[name] = (
+                float(METRIC_REGISTRY[name]().compute(base_model, metrics[name])),
+                None,
+            )
         except Exception as exc:  # recorded, not swallowed
-            error = f"{type(exc).__name__}: {exc}"
+            baselines[name] = (None, f"{type(exc).__name__}: {exc}")
+
+    utility_names = sorted(utility or {})
+    utility_baselines: dict[str, tuple[Optional[float], Optional[str]]] = {}
+    for name in utility_names:
+        try:
+            utility_baselines[name] = (float(utility[name](base_model)), None)
+        except Exception as exc:
+            utility_baselines[name] = (None, f"{type(exc).__name__}: {exc}")
+
+    fairness = []
+    for name in metric_names:
+        cls = METRIC_REGISTRY[name]
+        before, error = baselines[name]
+        after = None
+        try:
+            after = float(cls().compute(mitigated_model, metrics[name]))
+        except Exception as exc:
+            error = error or f"{type(exc).__name__}: {exc}"
         fairness.append(
             MetricDelta(
                 metric=name,
@@ -159,15 +185,13 @@ def compare_before_after(
         )
 
     utility_deltas = []
-    for name in sorted(utility or {}):
-        function = utility[name]
-        before = after = None
-        error = None
+    for name in utility_names:
+        before, error = utility_baselines[name]
+        after = None
         try:
-            before = float(function(base_model))
-            after = float(function(mitigated_model))
+            after = float(utility[name](mitigated_model))
         except Exception as exc:
-            error = f"{type(exc).__name__}: {exc}"
+            error = error or f"{type(exc).__name__}: {exc}"
         utility_deltas.append(
             MetricDelta(
                 metric=name,
@@ -177,6 +201,16 @@ def compare_before_after(
                 error=error,
             )
         )
+
+    # Leave the caller's base model as they handed it over. A reversible
+    # mitigated adapter says so with remove(); one that cannot be reversed is
+    # left alone rather than guessed at.
+    reverse = getattr(mitigated_model, "remove", None)
+    if callable(reverse):
+        try:
+            reverse()
+        except Exception:  # restoring is best effort; never fail the report
+            pass
 
     return ComparisonReport(
         fairness=tuple(fairness),

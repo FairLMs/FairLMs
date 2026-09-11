@@ -1,6 +1,10 @@
 """The before/after harness, and the aggregations it refuses to perform."""
 
 import json
+import numpy as np
+import torch
+from fairlms.models.base import LoadedModel, ModelAdapter
+from fairlms.mitigation.intraprocessing import ProjectedModelAdapter
 
 import pytest
 
@@ -91,3 +95,110 @@ class TestSeparationOfConcerns:
 
     def test_an_empty_report_is_representable(self):
         assert ComparisonReport().to_dict()["utility"] == []
+
+
+# --- regression: the base model must not be mutated across metrics -----------
+#
+# An intra-processing adapter installs a forward hook on the very nn.Module the
+# base adapter caches. Scoring one metric all the way through (before, then
+# after) used to leave that hook attached, so every later metric read its
+# "before" from the already mitigated model and reported a delta of exactly
+# zero. The first metric was right and every one after it was silently wrong.
+
+
+class _TinyModel(torch.nn.Module):
+    """Three-dimensional embedding table with a locatable input embedding."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.emb = torch.nn.Embedding(4, 3)
+        with torch.no_grad():
+            self.emb.weight.copy_(
+                torch.tensor(
+                    [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 1.0, 1.0]]
+                )
+            )
+
+    def get_input_embeddings(self):
+        return self.emb
+
+    def forward(self, ids):
+        return self.emb(ids)
+
+
+class _TinyAdapter(ModelAdapter):
+    name = "tiny"
+    task = "encoder"
+
+    def __init__(self) -> None:
+        self._loaded = None
+        self._module = _TinyModel()
+
+    def load(self):
+        if self._loaded is None:
+            self._loaded = LoadedModel(
+                name=self.name,
+                tokenizer=None,
+                model=self._module,
+                device="cpu",
+                task=self.task,
+            )
+        return self._loaded
+
+
+def _row_sum(adapter):
+    """Stand in for a metric: read something off the model's own forward pass."""
+    model = adapter.load().model
+    return float(model(torch.tensor([0, 1, 2, 3])).abs().sum())
+
+
+def _projected_pair():
+    base = _TinyAdapter()
+    mitigated = ProjectedModelAdapter(
+        base,
+        np.diag([1.0, 1.0, 0.0]),
+        method="subspace_projection",
+        axis="gender",
+        probe_family="test",
+    )
+    return base, mitigated
+
+
+def test_every_measure_sees_the_unmitigated_baseline():
+    base, mitigated = _projected_pair()
+
+    report = compare_before_after(
+        base,
+        mitigated,
+        metrics={},
+        utility={"first": _row_sum, "second": _row_sum, "third": _row_sum},
+    )
+
+    assert [d.metric for d in report.utility] == ["first", "second", "third"]
+    befores = {d.before for d in report.utility}
+    assert befores == {6.0}, f"baseline drifted across measures: {befores}"
+    for delta in report.utility:
+        assert delta.after == 4.0
+        assert delta.after - delta.before == -2.0
+
+
+def test_comparison_restores_the_caller_s_base_model():
+    base, mitigated = _projected_pair()
+    untouched = _row_sum(base)
+
+    compare_before_after(base, mitigated, metrics={}, utility={"probe": _row_sum})
+
+    assert _row_sum(base) == untouched
+
+
+def test_comparison_tolerates_an_irreversible_mitigated_model():
+    """A mitigated object with no remove() must still produce a report."""
+
+    class _Opaque:
+        pass
+
+    report = compare_before_after(
+        _TinyAdapter(), _Opaque(), metrics={}, utility={"probe": _row_sum}
+    )
+    assert report.utility[0].before == 6.0
+    assert report.utility[0].error is not None

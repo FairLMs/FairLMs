@@ -58,8 +58,7 @@ class DiscoveryOfCorrelationsScore(FairnessMetric):
         self.seed = seed
         self.templates = templates
 
-    @staticmethod
-    def _as_pipeline(model, tokenizer):
+    def _as_pipeline(self, model, tokenizer):
         """Return a fill-mask pipeline, building one from an MLM if needed."""
         if model is None:
             raise ValueError(
