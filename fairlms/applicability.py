@@ -73,6 +73,13 @@ CAPABILITIES: frozenset = frozenset(
         "token_logprobs",
         # Sampling free text from a prompt.
         "free_generation",
+        # A local tokenizer object paired with the weights. Twenty-four shipped
+        # metrics call ``resolve.get_tokenizer_model`` and then tokenize
+        # themselves, so a deployment that answers only over the wire cannot
+        # serve them however many logprobs it returns. Declaring it is what lets
+        # the matcher refuse those pairings by name instead of letting them die
+        # on a missing ``.tokenizer`` attribute deep inside the metric.
+        "local_tokenizer",
     }
 )
 
@@ -189,21 +196,23 @@ TASK_PROFILES: Mapping[str, ModelProfile] = {
     "mlm": ModelProfile(
         architecture="encoder_only",
         capabilities=frozenset(
-            {"hidden_states", "attentions", "gradients", "masked_token_scores"}
+            {
+                "local_tokenizer","hidden_states", "attentions", "gradients", "masked_token_scores"}
         ),
         access=AccessLevel.WHITE_BOX,
         task="mlm",
     ),
     "encoder": ModelProfile(
         architecture="encoder_only",
-        capabilities=frozenset({"hidden_states", "attentions", "gradients"}),
+        capabilities=frozenset({"local_tokenizer", "hidden_states", "attentions", "gradients"}),
         access=AccessLevel.WHITE_BOX,
         task="encoder",
     ),
     "sequence_classification": ModelProfile(
         architecture="encoder_only",
         capabilities=frozenset(
-            {"hidden_states", "attentions", "gradients", "sequence_logits"}
+            {
+                "local_tokenizer","hidden_states", "attentions", "gradients", "sequence_logits"}
         ),
         access=AccessLevel.WHITE_BOX,
         task="sequence_classification",
@@ -212,6 +221,7 @@ TASK_PROFILES: Mapping[str, ModelProfile] = {
         architecture="encoder_decoder",
         capabilities=frozenset(
             {
+                "local_tokenizer",
                 "hidden_states",
                 "attentions",
                 "gradients",
@@ -226,6 +236,7 @@ TASK_PROFILES: Mapping[str, ModelProfile] = {
         architecture="decoder_only",
         capabilities=frozenset(
             {
+                "local_tokenizer",
                 "hidden_states",
                 "attentions",
                 "gradients",

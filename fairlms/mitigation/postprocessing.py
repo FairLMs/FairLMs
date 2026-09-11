@@ -397,6 +397,45 @@ class GroupAwareThresholding(Mitigator):
 # ---------------------------------------------------------------------------
 # Reranking
 # ---------------------------------------------------------------------------
+def _rerank_one(
+    query: Any,
+    candidates: Sequence[Any],
+    *,
+    scorer: Any,
+    weight: float,
+    owner: str,
+) -> Tuple[list, list]:
+    """Reorder one candidate list; the single definition of the ordering.
+
+    Shared by :meth:`FairnessAwareReranking._apply` and
+    :meth:`FairnessAwareReranking.rerank` so a fitted rule cannot drift from the
+    ordering that produced it.
+    """
+    n = len(candidates)
+    scored = []
+    for rank, candidate in enumerate(candidates):
+        bias = scorer(query, candidate)
+        if isinstance(bias, bool) or not isinstance(bias, (int, float)):
+            raise TypeError(
+                f"{owner}: scorer must return a real number for "
+                f"(query={query!r}, candidate={candidate!r}); got "
+                f"{type(bias).__name__}."
+            )
+        bias = float(bias)
+        if not math.isfinite(bias):
+            raise ValueError(
+                f"{owner}: scorer returned a non-finite score for "
+                f"(query={query!r}, candidate={candidate!r})."
+            )
+        # Original position as a descending score in [0, 1].
+        original = 1.0 - (rank / (n - 1)) if n > 1 else 1.0
+        combined = (1.0 - weight) * original - weight * bias
+        scored.append((combined, rank, candidate, bias))
+    # Ties keep the generator's original order.
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    return [item[2] for item in scored], [item[3] for item in scored]
+
+
 class FairnessAwareReranking(Mitigator):
     """Reorder candidate generations by a **declared** bias scorer.
 
@@ -448,30 +487,15 @@ class FairnessAwareReranking(Mitigator):
 
         rankings, bias_scores = [], []
         for query, candidates in zip(evidence.queries, evidence.candidates):
-            n = len(candidates)
-            scored = []
-            for rank, candidate in enumerate(candidates):
-                bias = evidence.scorer(query, candidate)
-                if isinstance(bias, bool) or not isinstance(bias, (int, float)):
-                    raise TypeError(
-                        f"{self.name}: scorer must return a real number for "
-                        f"(query={query!r}, candidate={candidate!r}); got "
-                        f"{type(bias).__name__}."
-                    )
-                bias = float(bias)
-                if not math.isfinite(bias):
-                    raise ValueError(
-                        f"{self.name}: scorer returned a non-finite score for "
-                        f"(query={query!r}, candidate={candidate!r})."
-                    )
-                # Original position as a descending score in [0, 1].
-                original = 1.0 - (rank / (n - 1)) if n > 1 else 1.0
-                combined = (1.0 - self.weight) * original - self.weight * bias
-                scored.append((combined, rank, candidate, bias))
-            # Ties keep the generator's original order.
-            scored.sort(key=lambda item: (-item[0], item[1]))
-            rankings.append([item[2] for item in scored])
-            bias_scores.append([item[3] for item in scored])
+            order, biases = _rerank_one(
+                query,
+                candidates,
+                scorer=evidence.scorer,
+                weight=self.weight,
+                owner=self.name,
+            )
+            rankings.append(order)
+            bias_scores.append(biases)
 
         return self._result(
             {
@@ -482,4 +506,46 @@ class FairnessAwareReranking(Mitigator):
             },
             n_queries=evidence.n_queries,
             scorer_name=evidence.scorer_name,
+        )
+
+    @staticmethod
+    def rerank(
+        rule: Dict[str, Any],
+        query: Any,
+        candidates: Sequence[Any],
+        *,
+        scorer: Any,
+    ) -> Tuple[list, list]:
+        """Apply a fitted rule from :attr:`MitigationResult.result` to new candidates.
+
+        Mirrors :meth:`ScoreCalibration.transform` and
+        :meth:`GroupAwareThresholding.decide`: the fitted object is a rule, and
+        this re-applies it. Returns ``(reordered_candidates, bias_scores)``.
+
+        The scorer is passed in rather than stored, because a scorer is a live
+        callable and a rule has to stay serializable. ``rule['scorer_name']``
+        records which scorer produced the fit, so the caller can check they are
+        re-applying the same one; a mismatch is refused rather than silently
+        reordering by a different notion of bias.
+        """
+        for key in ("weight", "scorer_name"):
+            if key not in rule:
+                raise KeyError(
+                    f"rule is missing {key!r}; pass MitigationResult.result from "
+                    "FairnessAwareReranking."
+                )
+        declared = getattr(scorer, "__name__", None) or type(scorer).__name__
+        if rule["scorer_name"] not in (declared, "<lambda>", None):
+            if declared != "<lambda>":
+                raise ValueError(
+                    f"rule was fitted with scorer {rule['scorer_name']!r} but "
+                    f"{declared!r} was supplied; re-applying a rule under a "
+                    "different scorer would reorder by a different notion of bias."
+                )
+        return _rerank_one(
+            query,
+            candidates,
+            scorer=scorer,
+            weight=float(rule["weight"]),
+            owner="FairnessAwareReranking.rerank",
         )

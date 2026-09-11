@@ -265,3 +265,70 @@ class TestFairnessAwareReranking:
 
         with pytest.raises(TypeError, match="decoder_only"):
             FairnessAwareReranking().apply(TASK_PROFILES["mlm"], self._sets())
+
+
+# --- regression: all three post-processors return a re-appliable rule --------
+
+
+def _bias(query, candidate):
+    """Declared bias scorer: longer candidates are treated as more biased."""
+    return len(str(candidate)) / 10.0
+
+
+def test_every_post_processor_exposes_an_applier():
+    """The paper claims post-processing returns a fitted calibration, threshold
+    or reranking rule. Reranking used to return only the reordered output."""
+    from fairlms.mitigation import MITIGATOR_REGISTRY
+
+    assert hasattr(MITIGATOR_REGISTRY["score_calibration"], "transform")
+    assert hasattr(MITIGATOR_REGISTRY["group_aware_thresholding"], "decide")
+    assert hasattr(MITIGATOR_REGISTRY["fairness_aware_reranking"], "rerank")
+
+
+def test_a_fitted_reranking_rule_reproduces_its_own_fit():
+    evidence = CandidateSets(
+        queries=["q1"],
+        candidates=[["aaaa", "bb", "cccccc"]],
+        scorer=_bias,
+        scorer_name="_bias",
+    )
+    result = FairnessAwareReranking(weight=0.7).apply(None, evidence)
+    rule = result.result
+
+    replayed, biases = FairnessAwareReranking.rerank(
+        rule, "q1", ["aaaa", "bb", "cccccc"], scorer=_bias
+    )
+    assert replayed == rule["rankings"][0]
+    assert biases == rule["bias_scores"][0]
+
+
+def test_a_fitted_rule_applies_to_unseen_candidates():
+    evidence = CandidateSets(
+        queries=["q1"],
+        candidates=[["aaaa", "bb"]],
+        scorer=_bias,
+        scorer_name="_bias",
+    )
+    rule = FairnessAwareReranking(weight=1.0).apply(None, evidence).result
+
+    # weight=1.0 orders purely by ascending bias, i.e. by ascending length.
+    order, _ = FairnessAwareReranking.rerank(
+        rule, "unseen", ["ccccccc", "d", "ee"], scorer=_bias
+    )
+    assert order == ["d", "ee", "ccccccc"]
+
+
+def test_reapplying_a_rule_under_a_different_scorer_is_refused():
+    evidence = CandidateSets(
+        queries=["q1"],
+        candidates=[["aaaa", "bb"]],
+        scorer=_bias,
+        scorer_name="_bias",
+    )
+    rule = FairnessAwareReranking().apply(None, evidence).result
+
+    def _other(query, candidate):
+        return 0.0
+
+    with pytest.raises(ValueError, match="different notion of bias"):
+        FairnessAwareReranking.rerank(rule, "q1", ["aaaa", "bb"], scorer=_other)

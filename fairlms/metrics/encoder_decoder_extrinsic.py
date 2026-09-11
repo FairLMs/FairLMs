@@ -67,7 +67,7 @@ class CounterfactualAucScore(FairnessMetric):
     bias_type = "extrinsic"
     architectures = ("encoder_decoder",)
     required_task = "seq2seq"
-    requires = frozenset({"hidden_states"})
+    requires = frozenset({"hidden_states", "local_tokenizer"})
     accepts = (LabeledSentences,)
 
     def __init__(self, *, test_ratio: float = 0.2, seed: int = 42, n_seeds: int = 10):
@@ -257,7 +257,7 @@ class NormalizedPositionDistance(FairnessMetric):
     bias_type = "extrinsic"
     architectures = ("encoder_decoder",)
     required_task = "seq2seq"
-    requires = frozenset({"free_generation"})
+    requires = frozenset({"free_generation", "local_tokenizer"})
     accepts = RECORD_CORPUS
 
     def __init__(
@@ -329,7 +329,7 @@ class TranslationSimilarityScore(FairnessMetric):
     bias_type = "extrinsic"
     architectures = ("encoder_decoder",)
     required_task = "seq2seq"
-    requires = frozenset({"free_generation"})
+    requires = frozenset({"free_generation", "local_tokenizer"})
     accepts = RECORD_CORPUS
 
     def __init__(

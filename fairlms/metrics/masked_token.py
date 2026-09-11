@@ -42,7 +42,7 @@ class DiscoveryOfCorrelationsScore(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = (GroupWordPairs,)
 
     def __init__(
@@ -163,7 +163,7 @@ class LogProbabilityBiasScore(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = RECORD_CORPUS
 
     def __init__(
@@ -272,7 +272,7 @@ class ContrastBasedScore(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = (ContrastSpec,)
 
     def __init__(

@@ -72,7 +72,7 @@ class DemographicNextTokenProportion(_DemographicPromptMetric):
 
     name = "demographic_next_token_proportion"
     required_task = "causal"
-    requires = frozenset({"token_logprobs"})
+    requires = frozenset({"token_logprobs", "local_tokenizer"})
     accepts = (DemographicPrompts,)
 
     def compute(
@@ -118,7 +118,7 @@ class DemographicRepresentationDivergence(_DemographicPromptMetric):
 
     name = "demographic_representation_divergence"
     required_task = "causal"
-    requires = frozenset({"free_generation"})
+    requires = frozenset({"free_generation", "local_tokenizer"})
     accepts = (DemographicPrompts,)
 
     def __init__(self, *, max_new_tokens: int = 50):

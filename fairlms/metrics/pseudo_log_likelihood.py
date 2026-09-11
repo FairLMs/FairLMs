@@ -101,7 +101,7 @@ class CrowSPairsScore(_PairMetric):
 
     name = "crows_pairs_score"
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = RECORD_CORPUS
     _compute_fn = staticmethod(compute_cps)
 
@@ -111,7 +111,7 @@ class PseudoLogLikelihoodScore(_PairMetric):
 
     name = "pseudo_log_likelihood_score"
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = RECORD_CORPUS
     _compute_fn = staticmethod(compute_pll)
 
@@ -128,7 +128,7 @@ class AllUnmaskedLikelihoodScore(_PairMetric):
 
     name = "all_unmasked_likelihood_score"
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = RECORD_CORPUS
     _compute_fn = staticmethod(compute_aul)
     _extra_allowed = ("use_attention",)
@@ -145,7 +145,7 @@ class AllUnmaskedLikelihoodAttentionScore(_PairMetric):
 
     name = "all_unmasked_likelihood_attention_score"
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores", "attentions"})
+    requires = frozenset({"masked_token_scores", "attentions", "local_tokenizer"})
     accepts = RECORD_CORPUS
     _compute_fn = staticmethod(compute_aula)
     _extra_allowed = ("use_attention",)
@@ -168,7 +168,7 @@ class ContextAssociationTestScore(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = (SentenceTriples,)
 
     def compute(
