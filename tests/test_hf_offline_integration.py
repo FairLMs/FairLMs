@@ -9,7 +9,7 @@ import json
 import numpy as np
 import pytest
 import torch
-from tokenizers import Tokenizer, models, pre_tokenizers
+from tokenizers import Tokenizer, models, normalizers, pre_tokenizers, processors
 from transformers import (
     BertConfig,
     BertForMaskedLM,
@@ -51,12 +51,45 @@ VOCAB = [
 PAIRS = [{"stereotype": "he is a doctor .", "anti_stereotype": "she is a doctor ."}]
 
 
+def bert_tokenizer():
+    """Build the WordPiece backend explicitly, the way ``word_tokenizer`` does.
+
+    ``BertTokenizerFast(vocab_file=...)`` silently stopped honouring the file in
+    transformers 5.x: the vocabulary came back holding only the five special
+    tokens, every content word became ``[UNK]``, and because ``[UNK]`` counts as
+    special there were no scoreable positions left. Passing a fully constructed
+    ``tokenizer_object`` is the one route both 4.x and 5.x read the same way.
+
+    The normalizer is not optional. ``BertTokenizerFast.__init__`` on 4.x reads
+    ``backend_tokenizer.normalizer`` and raises a bare ``TypeError`` when it is
+    ``None``.
+    """
+    engine = Tokenizer(
+        models.WordPiece({t: i for i, t in enumerate(VOCAB)}, unk_token="[UNK]")
+    )
+    engine.normalizer = normalizers.BertNormalizer(lowercase=True)
+    engine.pre_tokenizer = pre_tokenizers.Whitespace()
+    engine.post_processor = processors.TemplateProcessing(
+        single="[CLS] $A [SEP]",
+        pair="[CLS] $A [SEP] $B:1 [SEP]:1",
+        special_tokens=[
+            ("[CLS]", VOCAB.index("[CLS]")),
+            ("[SEP]", VOCAB.index("[SEP]")),
+        ],
+    )
+    return BertTokenizerFast(
+        tokenizer_object=engine,
+        unk_token="[UNK]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        sep_token="[SEP]",
+        mask_token="[MASK]",
+    )
+
+
 @pytest.fixture
 def bert_checkpoint(tmp_path):
-    vocab = tmp_path / "vocab.txt"
-    vocab.write_text("\n".join(VOCAB) + "\n")
-    tokenizer = BertTokenizerFast(vocab_file=str(vocab), do_lower_case=True)
-    tokenizer.save_pretrained(tmp_path)
+    bert_tokenizer().save_pretrained(tmp_path)
     with torch.random.fork_rng():
         torch.manual_seed(0)
         model = BertForMaskedLM(
