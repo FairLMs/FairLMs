@@ -86,6 +86,7 @@ Users then upgrade with `pip install --upgrade fairlms`.
 
 | Version | Change | Migration |
 |---------|--------|-----------|
+| 0.5.0.dev0 | Correct StereoSet roles/context; explicit projection layer/pair IDs; generation-only SelfDebiasing; XNLI counterfactual schema; undefined DRD; explicit comparison evidence | See the [changelog](docs/changelog.md); recompute affected results |
 | 0.4.0 | WEAT/SEAT sample permutations from a call-local generator, so `np.random.seed(...)` no longer pins their p-values | Pass the seed as config: `WEAT(seed=0)`, `SEAT(seed=0)`. Seeded p-values differ from pre-0.4.0 values for the same nominal seed (PCG64 vs Mersenne Twister); effect sizes are unaffected |
 | 0.3.0 | Project renamed `fairllms` → `fairlms` | `pip install fairlms`, `import fairlms` |
 | 0.2.0 | Package renamed `fairLLMs` → `fairllms` (PEP 8) | `import fairllms` |

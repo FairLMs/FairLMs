@@ -60,7 +60,9 @@ def _check_str_seq(value: Any, role: str) -> tuple:
         )
     items = tuple(value)
     if not items:
-        raise ValueError(f"{role} must contain at least one term, got an empty sequence.")
+        raise ValueError(
+            f"{role} must contain at least one term, got an empty sequence."
+        )
     bad = [x for x in items if not isinstance(x, str)]
     if bad:
         raise TypeError(
@@ -73,9 +75,7 @@ def _check_str_seq(value: Any, role: str) -> tuple:
 def _check_seq(value: Any, role: str) -> tuple:
     """Non-empty sequence of anything (labels may be ints, floats, or strings)."""
     if isinstance(value, str) or not isinstance(value, (list, tuple, Sequence)):
-        raise TypeError(
-            f"{role} must be a sequence, got {type(value).__name__}."
-        )
+        raise TypeError(f"{role} must be a sequence, got {type(value).__name__}.")
     items = tuple(value)
     if not items:
         raise ValueError(f"{role} must not be empty.")
@@ -85,9 +85,7 @@ def _check_seq(value: Any, role: str) -> tuple:
 def _check_same_length(**named: Sequence[Any]) -> None:
     lengths = {name: len(seq) for name, seq in named.items()}
     if len(set(lengths.values())) > 1:
-        raise ValueError(
-            f"These must all have the same length, got {lengths}."
-        )
+        raise ValueError(f"These must all have the same length, got {lengths}.")
 
 
 def _check_dict_seq(value: Any, role: str) -> Dict[str, tuple]:
@@ -218,9 +216,7 @@ class ContextSets:
     def min_contexts(self) -> int:
         """Fewest contexts available for any single term across all roles."""
         return min(
-            len(ctxs)
-            for role in _ROLES
-            for ctxs in getattr(self, role).values()
+            len(ctxs) for role in _ROLES for ctxs in getattr(self, role).values()
         )
 
     def require_contexts(self, sample_size: int, metric_name: str) -> None:
@@ -246,6 +242,7 @@ class SentenceTriples:
     stereotype: Sequence[str]
     anti_stereotype: Sequence[str]
     unrelated: Sequence[str]
+    contexts: Optional[Sequence[Optional[str]]] = None
 
     def __post_init__(self) -> None:
         for role in ("stereotype", "anti_stereotype", "unrelated"):
@@ -256,14 +253,27 @@ class SentenceTriples:
             unrelated=self.unrelated,
         )
 
+        if self.contexts is not None:
+            if len(self.contexts) != len(self.stereotype) or any(
+                c is not None and (not isinstance(c, str) or not c.strip())
+                for c in self.contexts
+            ):
+                raise ValueError(
+                    "contexts must align with triples and contain non-empty strings or None."
+                )
+            object.__setattr__(self, "contexts", tuple(self.contexts))
+
     def __len__(self) -> int:
         return len(self.stereotype)
 
     @classmethod
     def from_examples(cls, examples: Sequence[Any]) -> "SentenceTriples":
         """Build from dicts (``stereotype``/``anti_stereotype``/``unrelated``) or 3-tuples."""
-        stereo, anti, unrel = [], [], []
+        stereo, anti, unrel, contexts = [], [], [], []
         for ex in examples:
+            contexts.append(
+                ex.get("scoring_context") if isinstance(ex, Mapping) else None
+            )
             if isinstance(ex, Mapping):
                 try:
                     stereo.append(ex["stereotype"])
@@ -275,13 +285,20 @@ class SentenceTriples:
                         f"'stereotype', 'anti_stereotype' and 'unrelated'."
                     ) from exc
             elif isinstance(ex, (list, tuple)) and len(ex) >= 3:
-                stereo.append(ex[0]); anti.append(ex[1]); unrel.append(ex[2])
+                stereo.append(ex[0])
+                anti.append(ex[1])
+                unrel.append(ex[2])
             else:
                 raise TypeError(
                     f"Cannot read a triple from {type(ex).__name__}; expected a "
                     f"mapping or a 3-element sequence."
                 )
-        return cls(stereo, anti, unrel)
+        return cls(
+            stereo,
+            anti,
+            unrel,
+            contexts=contexts if any(c is not None for c in contexts) else None,
+        )
 
 
 @dataclass(frozen=True)
@@ -293,7 +310,9 @@ class LabeledSentences:
     pair_ids: Optional[Sequence[Any]] = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "sentences", _check_str_seq(self.sentences, "sentences"))
+        object.__setattr__(
+            self, "sentences", _check_str_seq(self.sentences, "sentences")
+        )
         object.__setattr__(self, "labels", _check_seq(self.labels, "labels"))
         _check_same_length(sentences=self.sentences, labels=self.labels)
         if self.pair_ids is not None:
@@ -308,9 +327,11 @@ class LabeledSentences:
         sents, labels = [], []
         for ex in examples:
             if isinstance(ex, Mapping):
-                sents.append(ex["sentence"]); labels.append(ex["label"])
+                sents.append(ex["sentence"])
+                labels.append(ex["label"])
             elif isinstance(ex, (list, tuple)) and len(ex) >= 2:
-                sents.append(ex[0]); labels.append(ex[1])
+                sents.append(ex[0])
+                labels.append(ex[1])
             else:
                 raise TypeError(
                     f"Cannot read (sentence, label) from {type(ex).__name__}."
@@ -348,9 +369,7 @@ class GroupPredictions:
     def __post_init__(self) -> None:
         for role in ("y_true", "y_pred", "groups"):
             object.__setattr__(self, role, _check_seq(getattr(self, role), role))
-        _check_same_length(
-            y_true=self.y_true, y_pred=self.y_pred, groups=self.groups
-        )
+        _check_same_length(y_true=self.y_true, y_pred=self.y_pred, groups=self.groups)
 
     def __len__(self) -> int:
         return len(self.y_true)
@@ -371,7 +390,8 @@ class GroupPredictions:
                     f"Expected mappings with 'y_true'/'y_pred'/'group', got "
                     f"{type(ex).__name__}."
                 )
-            y_true.append(ex["y_true"]); y_pred.append(ex["y_pred"])
+            y_true.append(ex["y_true"])
+            y_pred.append(ex["y_pred"])
             groups.append(ex.get("group", ex.get("groups")))
         return cls(y_true, y_pred, groups)
 
@@ -392,9 +412,11 @@ class ScorePair:
         s, sp = [], []
         for ex in examples:
             if isinstance(ex, Mapping):
-                s.append(ex["scores_s"]); sp.append(ex["scores_sp"])
+                s.append(ex["scores_s"])
+                sp.append(ex["scores_sp"])
             elif isinstance(ex, (list, tuple)) and len(ex) >= 2:
-                s.append(ex[0]); sp.append(ex[1])
+                s.append(ex[0])
+                sp.append(ex[1])
             else:
                 raise TypeError(f"Cannot read a score pair from {type(ex).__name__}.")
         return cls(s, sp)
@@ -426,7 +448,8 @@ class PromptPairs:
                 fact.append(ex.get("factual") or ex.get("stereotype"))
                 cf.append(ex.get("counterfactual") or ex.get("anti_stereotype"))
             elif isinstance(ex, (list, tuple)) and len(ex) >= 2:
-                fact.append(ex[0]); cf.append(ex[1])
+                fact.append(ex[0])
+                cf.append(ex[1])
             else:
                 raise TypeError(f"Cannot read a prompt pair from {type(ex).__name__}.")
         return cls(fact, cf)
@@ -451,7 +474,9 @@ class DemographicPrompts:
             object.__setattr__(self, role, _check_str_seq(getattr(self, role), role))
         if self.neutral_words is not None:
             object.__setattr__(
-                self, "neutral_words", _check_str_seq(self.neutral_words, "neutral_words")
+                self,
+                "neutral_words",
+                _check_str_seq(self.neutral_words, "neutral_words"),
             )
 
     def require_neutral(self, metric_name: str) -> None:
@@ -575,7 +600,9 @@ class ContrastSpec:
         object.__setattr__(
             self, "group_terms", _check_str_seq(self.group_terms, "group_terms")
         )
-        object.__setattr__(self, "templates", _check_str_seq(self.templates, "templates"))
+        object.__setattr__(
+            self, "templates", _check_str_seq(self.templates, "templates")
+        )
         triples = _check_seq(self.contrast_pairs, "contrast_pairs")
         cleaned = []
         for i, item in enumerate(triples):

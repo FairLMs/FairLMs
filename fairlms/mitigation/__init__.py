@@ -83,7 +83,12 @@ from .evidence import (
     SwapLexicon,
     TextRecords,
 )
-from .harness import ComparisonReport, MetricDelta, compare_before_after
+from .harness import (
+    ComparisonReport,
+    MetricDelta,
+    MetricEvaluation,
+    compare_before_after,
+)
 from .inprocessing import (
     AdversarialDebiasing,
     CounterfactualInvarianceLoss,
@@ -171,5 +176,6 @@ __all__ = [
     # Before/after harness
     "ComparisonReport",
     "MetricDelta",
+    "MetricEvaluation",
     "compare_before_after",
 ]

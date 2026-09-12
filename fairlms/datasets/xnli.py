@@ -47,7 +47,7 @@ DEFAULT_RELIGION_TEMPLATES = (
 
 
 class XNLIReligionPairs(FairnessDataset):
-    """Build religion stereotype/anti pairs from XNLI + templates.
+    """Build religion counterfactual pairs from XNLI + templates.
 
     This mirrors the CPS/AUL/AULA/PLL runners: mine premises containing a
     religion term, swap to a counterpart, then expand with templates.
@@ -64,10 +64,12 @@ class XNLIReligionPairs(FairnessDataset):
         religion_swaps: Sequence[Tuple[str, str]] = DEFAULT_RELIGION_SWAPS,
         religion_groups: Sequence[str] = DEFAULT_RELIGION_GROUPS,
         templates: Sequence[str] = DEFAULT_RELIGION_TEMPLATES,
+        revision: Optional[str] = None,
     ):
         self.split = split
         self.n_max = n_max
         self.hf_path = hf_path
+        self.revision = revision
         self.include_templates = include_templates
         self.religion_swaps = religion_swaps
         self.religion_groups = religion_groups
@@ -78,14 +80,17 @@ class XNLIReligionPairs(FairnessDataset):
         from datasets import load_dataset
 
         errors = []
-        candidates = (
-            [self.hf_path] if self.hf_path else ["xnli", "facebook/xnli"]
-        )
+        candidates = [self.hf_path] if self.hf_path else ["xnli", "facebook/xnli"]
         for path in candidates:
             if not path:
                 continue
             try:
-                return load_dataset(path, "en", split=self.split)
+                loaded = load_dataset(
+                    path, "en", split=self.split, revision=self.revision
+                )
+                self._resolved_hf_path = path
+                self._resolved_fingerprint = getattr(loaded, "_fingerprint", None)
+                return loaded
             except Exception as exc:  # noqa: BLE001
                 errors.append(f"{path}: {exc}")
         raise RuntimeError(
@@ -100,44 +105,62 @@ class XNLIReligionPairs(FairnessDataset):
         pairs: List[dict] = []
         seen = set()
 
+        def add(factual, counterfactual, a, b, source):
+            # One unordered text pair, with its actual intervention direction
+            # retained as metadata; no stereotype claim is inferred.
+            key = tuple(sorted((factual.casefold(), counterfactual.casefold())))
+            if factual == counterfactual or key in seen:
+                return
+            seen.add(key)
+            pairs.append(
+                {
+                    "factual": factual,
+                    "counterfactual": counterfactual,
+                    "group_factual": a,
+                    "group_counterfactual": b,
+                    "pair_id": f"religion-{len(pairs)}",
+                    "bias_type": "religion",
+                    "source": source,
+                    "pairing_basis": "lexical substitution; semantic equivalence requires review",
+                }
+            )
+
         for row in ds:
             premise = row["premise"]
-            p_lower = premise.lower()
             for a, b in self.religion_swaps:
-                if a in p_lower:
-                    stereo = premise
-                    anti = re.sub(a, b, premise, flags=re.IGNORECASE)
-                    if anti != stereo:
-                        key = (stereo, anti)
-                        if key not in seen:
-                            seen.add(key)
-                            pairs.append(
-                                {
-                                    "stereotype": stereo,
-                                    "anti_stereotype": anti,
-                                    "bias_type": "religion",
-                                }
-                            )
+                pattern = re.compile(
+                    r"(?<!\w)" + re.escape(a) + r"(?!\w)", re.IGNORECASE
+                )
+
+                def replace(match):
+                    value = match.group(0)
+                    return (
+                        b.upper()
+                        if value.isupper()
+                        else b.capitalize() if value[:1].isupper() else b
+                    )
+
+                anti = pattern.sub(replace, premise)
+                add(premise, anti, a, b, "XNLI premise")
+                if self.n_max is not None and len(pairs) >= self.n_max:
+                    break
             if self.n_max is not None and len(pairs) >= self.n_max:
                 break
 
-        if self.include_templates and (
-            self.n_max is None or len(pairs) < self.n_max
-        ):
+        if self.include_templates and (self.n_max is None or len(pairs) < self.n_max):
             for template in self.templates:
-                for a, b in itertools.permutations(self.religion_groups, 2):
-                    stereo = template.format(group=a.capitalize())
-                    anti = template.format(group=b.capitalize())
-                    key = (stereo, anti)
-                    if key not in seen:
-                        seen.add(key)
-                        pairs.append(
-                            {
-                                "stereotype": stereo,
-                                "anti_stereotype": anti,
-                                "bias_type": "religion",
-                            }
-                        )
+                for a, b in itertools.combinations(self.religion_groups, 2):
+                    add(
+                        template.format(group=a.capitalize()),
+                        template.format(group=b.capitalize()),
+                        a,
+                        b,
+                        "declared template",
+                    )
+                    if self.n_max is not None and len(pairs) >= self.n_max:
+                        break
+                if self.n_max is not None and len(pairs) >= self.n_max:
+                    break
 
         self._cache = pairs
         return optional_limit(pairs, self.n_max)

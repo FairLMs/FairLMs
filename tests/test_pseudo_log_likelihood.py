@@ -29,6 +29,7 @@ from tests.stubs import (
     expected_logits,
 )
 
+
 # ---------------------------------------------------------------------------
 # Independent re-derivation of the stub's sentence scores
 # ---------------------------------------------------------------------------
@@ -137,8 +138,16 @@ class TestPseudoLogLikelihoodScore:
 
     def test_all_stereotypical_pairs_score_one_hundred(self, stub_bundle):
         favouring_stereotype = [
-            {"stereotype": "he doctor", "anti_stereotype": "she doctor", "bias_type": "g"},
-            {"stereotype": "she nurse", "anti_stereotype": "he nurse", "bias_type": "g"},
+            {
+                "stereotype": "he doctor",
+                "anti_stereotype": "she doctor",
+                "bias_type": "g",
+            },
+            {
+                "stereotype": "she nurse",
+                "anti_stereotype": "he nurse",
+                "bias_type": "g",
+            },
         ]
         result = PseudoLogLikelihoodScore().compute(stub_bundle, favouring_stereotype)
         assert result.score == pytest.approx(100.0)
@@ -155,19 +164,12 @@ class TestPseudoLogLikelihoodScore:
         result = PseudoLogLikelihoodScore().compute(stub_bundle, flipped)
         assert result.by_category == {"gender": 0.0, "profession": 100.0}
 
-    def test_empty_sentences_have_no_maskable_position(self, stub_bundle):
-        """With nothing between ``[CLS]`` and ``[SEP]`` the scorer returns ``(0.0, [-1])``.
-
-        The sentinel ``-1`` must be dropped from the accuracy denominator rather
-        than counted as a miss — otherwise a corpus with a few blank rows drags
-        the reported accuracy down for no reason.
-        """
-        result = PseudoLogLikelihoodScore().compute(
-            stub_bundle,
-            [{"stereotype": "", "anti_stereotype": "", "bias_type": "g"}],
-        )
-        assert result.details["accuracy"] == 0.0
-        assert result.score == 0.0
+    def test_empty_sentences_are_refused(self, stub_bundle):
+        with pytest.raises(ValueError, match="non-empty"):
+            PseudoLogLikelihoodScore().compute(
+                stub_bundle,
+                [{"stereotype": "", "anti_stereotype": "", "bias_type": "g"}],
+            )
 
     def test_one_word_sentences_are_scored_against_an_empty_context(self, stub_bundle):
         """A single word still has one maskable position, scored against ``BASE`` alone.
@@ -194,8 +196,13 @@ class TestCrowSPairsScore:
         """
         result = CrowSPairsScore().compute(stub_bundle, pairs)
         expected = (
-            _shared_span_wins("doctor", "he", "she") + _shared_span_wins("nurse", "he", "she")
-        ) / 2 * 100
+            (
+                _shared_span_wins("doctor", "he", "she")
+                + _shared_span_wins("nurse", "he", "she")
+            )
+            / 2
+            * 100
+        )
         assert result.score == pytest.approx(expected)
         assert result.by_category == {"gender": 100.0, "profession": 0.0}
 
@@ -221,7 +228,13 @@ class TestCrowSPairsScore:
     def test_identical_sentences_leave_nothing_unshared(self, stub_bundle):
         result = CrowSPairsScore().compute(
             stub_bundle,
-            [{"stereotype": "he doctor", "anti_stereotype": "he doctor", "bias_type": "g"}],
+            [
+                {
+                    "stereotype": "he doctor",
+                    "anti_stereotype": "he doctor",
+                    "bias_type": "g",
+                }
+            ],
         )
         assert result.score == 0.0
 
@@ -345,10 +358,14 @@ class TestContextAssociationTestScore:
 
     def test_rows_record_every_log_probability(self, stub_bundle):
         triples = SentenceTriples(["he doctor"], ["she doctor"], ["engineer engineer"])
-        rows = ContextAssociationTestScore().compute(stub_bundle, triples).details["rows"]
+        rows = (
+            ContextAssociationTestScore().compute(stub_bundle, triples).details["rows"]
+        )
         assert rows[0]["lp_stereo"] == pytest.approx(_pll("he doctor"), abs=1e-5)
         assert rows[0]["lp_anti"] == pytest.approx(_pll("she doctor"), abs=1e-5)
-        assert rows[0]["lp_related"] == pytest.approx(_pll("engineer engineer"), abs=1e-5)
+        assert rows[0]["lp_related"] == pytest.approx(
+            _pll("engineer engineer"), abs=1e-5
+        )
 
     def test_accepts_a_sequence_of_dicts(self, stub_bundle):
         """Datasets yield dicts; the wrapper coerces them to ``SentenceTriples``."""

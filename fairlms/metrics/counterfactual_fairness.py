@@ -27,7 +27,7 @@ class _PromptPairMetric(FairnessMetric):
     bias_type = "extrinsic"
     architectures = ("decoder_only",)
 
-    def __init__(self, *, completion_model: str = "gpt-3.5-turbo-instruct"):
+    def __init__(self, *, completion_model: str | None = None):
         self.completion_model = completion_model
 
     def _prepare(self, data: Any, legacy: dict) -> PromptPairs:
@@ -70,22 +70,31 @@ class CounterfactualRobustness(_PromptPairMetric):
     """
 
     name = "counterfactual_robustness"
-    requires = frozenset({"free_generation"})
+    requires = frozenset({"free_generation", "completions_api"})
     accepts = (PromptPairs,)
 
     def compute(
         self, model: Any = None, data: Any = None, **legacy: Any
     ) -> MetricResult:
         pairs = self._prepare(data, legacy)
-        bundle = get_openai_bundle(model)
+        bundle = get_openai_bundle(model, metric=self)
         cr, rows = compute_cr(
             bundle.client,
             list(pairs.factual),
             list(pairs.counterfactual),
-            model=legacy.get("completion_model", self.completion_model),
+            model=legacy.get("completion_model", self.completion_model) or bundle.model,
         )
         return MetricResult(
-            score=float(cr), details={"rows": rows, "n_pairs": len(pairs)}
+            score=float(cr),
+            details={
+                "rows": rows,
+                "n_pairs": len(pairs),
+                "n_valid": len(rows),
+                "completion_model": legacy.get(
+                    "completion_model", self.completion_model
+                )
+                or bundle.model,
+            },
         )
 
 
@@ -98,20 +107,29 @@ class CounterfactualFairnessScore(_PromptPairMetric):
     """
 
     name = "counterfactual_fairness"
-    requires = frozenset({"token_logprobs"})
+    requires = frozenset({"token_logprobs", "completions_api"})
     accepts = (PromptPairs,)
 
     def compute(
         self, model: Any = None, data: Any = None, **legacy: Any
     ) -> MetricResult:
         pairs = self._prepare(data, legacy)
-        bundle = get_openai_bundle(model)
+        bundle = get_openai_bundle(model, metric=self)
         ctf, rows = compute_ctf(
             bundle.client,
             list(pairs.factual),
             list(pairs.counterfactual),
-            model=legacy.get("completion_model", self.completion_model),
+            model=legacy.get("completion_model", self.completion_model) or bundle.model,
         )
         return MetricResult(
-            score=float(ctf), details={"rows": rows, "n_pairs": len(pairs)}
+            score=float(ctf),
+            details={
+                "rows": rows,
+                "n_pairs": len(pairs),
+                "n_valid": len(rows),
+                "completion_model": legacy.get(
+                    "completion_model", self.completion_model
+                )
+                or bundle.model,
+            },
         )

@@ -34,7 +34,8 @@ class _DemographicPromptMetric(FairnessMetric):
 
     def _prepare(self, data: Any, legacy: dict, *allowed: str) -> DemographicPrompts:
         data = unwrap(
-            data if data is not None else legacy.pop("dataset", None), DemographicPrompts
+            data if data is not None else legacy.pop("dataset", None),
+            DemographicPrompts,
         )
 
         if not isinstance(data, DemographicPrompts):
@@ -52,9 +53,7 @@ class _DemographicPromptMetric(FairnessMetric):
                     f"compute(model, DemographicPrompts(prompts, "
                     f'["he"], ["she"]))'
                 )
-            warn_legacy(
-                type(self).__name__, [k0, k1, k2, k3], "DemographicPrompts"
-            )
+            warn_legacy(type(self).__name__, [k0, k1, k2, k3], "DemographicPrompts")
             for key in (k0, k1, k2, k3):
                 legacy.pop(key, None)
             data = DemographicPrompts(prompts, stereo, counter, neutral)
@@ -148,6 +147,14 @@ class DemographicRepresentationDivergence(_DemographicPromptMetric):
             details={
                 "n_stereotype_total": n_s,
                 "n_counter_total": n_sp,
+                "status": "ready" if n_s + n_sp else "insufficient_evidence",
+                "reason": (
+                    None
+                    if n_s + n_sp
+                    else "No demographic terms matched the generations."
+                ),
+                "mention_coverage": sum(bool(r["n_s"] + r["n_sp"]) for r in rows)
+                / len(rows),
                 "rows": rows,
                 "n_prompts": len(prompts.prompts),
             },

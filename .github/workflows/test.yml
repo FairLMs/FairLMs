@@ -55,6 +55,8 @@ jobs:
       - name: Run tests
         env:
           HF_HUB_OFFLINE: "1"
+          OMP_NUM_THREADS: "1"
+          OPENBLAS_NUM_THREADS: "1"
         run: pytest -q
 
   # Installs the built wheel into a fresh environment with no source checkout on
@@ -93,3 +95,8 @@ jobs:
           equal_opportunity_gap([1, 1, 0], [1, 0, 0], ['A', 'B', 'A'], g1='A', g2='B')
           print('clean install OK, version', fairlms.__version__)
           "
+
+      - name: Validate the source archive independently
+        run: |
+          pip install ".[dev,docs]"
+          python scripts/check_sdist.py dist/*.tar.gz --docs

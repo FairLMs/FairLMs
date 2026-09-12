@@ -53,8 +53,13 @@ def _vectors(**overrides):
         vectors=[[2.0, 0.1], [1.8, -0.1], [-2.0, 0.1], [-1.9, -0.2]],
         labels=["f", "f", "m", "m"],
         source="unit-test",
+        representation_layer="input_embeddings",
+        pooling="token",
+        pair_ids=["p1", "p2", "p1", "p2"],
     )
     kwargs.update(overrides)
+    if len(kwargs["labels"]) != 4:
+        kwargs["pair_ids"] = None
     return AttributeLabeledVectors(**kwargs)
 
 
@@ -119,14 +124,14 @@ class TestSubspaceProjection:
             vectors=[[1.0, 0.0], [2.0, 0.0], [3.0, 0.0]],
             labels=["f", "f", "m"],
         )
-        with pytest.raises(ValueError, match="equally many rows"):
+        with pytest.raises(ValueError, match="explicit pair_ids"):
             SubspaceProjection().apply(StubEncoderAdapter(), evidence)
 
     def test_textual_pairs_without_an_encoder_are_refused(self):
         from fairlms.metrics import PromptPairs
 
         with pytest.raises(ValueError, match="needs an encoder"):
-            SubspaceProjection().apply(
+            SubspaceProjection(layer="input_embeddings").apply(
                 StubEncoderAdapter(), PromptPairs(["he"], ["she"])
             )
 
@@ -173,8 +178,9 @@ class TestIterativeNullspaceProjection:
         result = IterativeNullspaceProjection().apply(StubEncoderAdapter(), _vectors())
         history = result.provenance["probe_accuracy_history"]
         assert history and all(0.0 <= a <= 1.0 for a in history)
-        assert result.provenance["final_probe_accuracy"] == history[-1]
-        assert result.provenance["n_iterations_run"] == len(history)
+        assert 0 <= result.provenance["final_probe_accuracy"] <= 1
+        assert "held-out" in result.provenance["probe_evaluation"]
+        assert result.provenance["n_iterations_run"] <= len(history)
 
     def test_the_composed_projection_is_idempotent(self):
         result = IterativeNullspaceProjection().apply(StubEncoderAdapter(), _vectors())
@@ -264,6 +270,9 @@ class TestTheAdapterGuarantee:
             vectors=np.eye(8)[:4] * 2.0,
             labels=["f", "f", "m", "m"],
             source="unit-test",
+            representation_layer="input_embeddings",
+            pooling="token",
+            pair_ids=["p1", "p2", "p1", "p2"],
         )
         mitigated = SubspaceProjection().apply(base, evidence).result
 
@@ -287,6 +296,9 @@ class TestTheAdapterGuarantee:
             vectors=np.eye(8)[:4] * 2.0,
             labels=["f", "f", "m", "m"],
             source="unit-test",
+            representation_layer="input_embeddings",
+            pooling="token",
+            pair_ids=["p1", "p2", "p1", "p2"],
         )
         mitigated = SubspaceProjection().apply(StubEncoderAdapter(), evidence).result
 
@@ -328,7 +340,16 @@ class TestTheAdapterGuarantee:
         assert not np.isnan(expected)
 
         shared = StubEncoderAdapter()
-        mitigated = SubspaceProjection().apply(shared, _vectors()).result
+        mitigated = (
+            SubspaceProjection()
+            .apply(
+                shared,
+                _vectors(
+                    vectors=np.pad(np.array(_vectors().vectors), ((0, 0), (0, 6)))
+                ),
+            )
+            .result
+        )
         mitigated.load()
         mitigated.remove()
         assert float(WEAT().compute(shared, words)) == pytest.approx(expected)

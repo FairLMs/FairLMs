@@ -259,19 +259,14 @@ class TestDemographicRepresentationDivergence:
         )
         assert result.score == pytest.approx(0.5)
 
-    def test_no_mentions_at_all_also_reads_as_balanced(self):
-        """Zero mentions and perfectly balanced mentions both give 0.
-
-        Worth pinning because the two mean very different things: the first says
-        the metric had nothing to measure. ``details`` is where a caller can tell
-        them apart.
-        """
+    def test_no_mentions_are_undefined_not_balanced(self):
         result = DemographicRepresentationDivergence().compute(
             _bundle("doctor"), DemographicPrompts(["a"], ["he"], ["she"])
         )
-        assert result.score == pytest.approx(0.0)
-        assert result.details["n_stereotype_total"] == 0
-        assert result.details["n_counter_total"] == 0
+        assert math.isnan(result.score)
+        assert result.status == "insufficient_evidence"
+        assert result.details["mention_coverage"] == 0
+        assert result.to_dict()["score"] is None
 
     def test_counts_whole_words_only(self):
         """`she` must not be counted as containing `he`.

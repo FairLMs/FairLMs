@@ -164,7 +164,7 @@ class TestScoreSentence:
 
     def test_attention_requires_an_encoder(self, stub_tokenizer):
         headless = StubMaskedLM(expose_encoder=False)
-        with pytest.raises(AttributeError, match="bert or .roberta"):
+        with pytest.raises(AttributeError, match="attention tensors"):
             score_sentence(stub_tokenizer, headless, SENTENCE, use_attention=True)
 
     def test_fused_attention_backend_is_switched_to_eager(self, stub_tokenizer):
@@ -175,8 +175,8 @@ class TestScoreSentence:
         """
         fused = StubMaskedLM(attn_implementation="sdpa")
         score_sentence(stub_tokenizer, fused, SENTENCE, use_attention=True)
-        assert fused.attn_implementation_calls == ["eager"]
-        assert fused.config._attn_implementation == "eager"
+        assert fused.attn_implementation_calls == ["eager", "sdpa"]
+        assert fused.config._attn_implementation == "sdpa"
 
     def test_eager_backend_is_left_alone(self, stub_tokenizer, stub_mlm):
         score_sentence(stub_tokenizer, stub_mlm, SENTENCE, use_attention=True)
@@ -333,7 +333,9 @@ class TestGetMultitokenLogProb:
             "[MASK] is a nurse", "   ", stub_tokenizer, stub_mlm
         ) == pytest.approx(math.log(1e-10))
 
-    def test_unknown_sub_token_falls_back_to_log_epsilon(self, stub_tokenizer, stub_mlm):
+    def test_unknown_sub_token_falls_back_to_log_epsilon(
+        self, stub_tokenizer, stub_mlm
+    ):
         assert get_multitoken_log_prob(
             "[MASK] is a nurse", "hobbit", stub_tokenizer, stub_mlm
         ) == pytest.approx(math.log(1e-10))

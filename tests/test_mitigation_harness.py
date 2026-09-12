@@ -9,7 +9,13 @@ from fairlms.mitigation.intraprocessing import ProjectedModelAdapter
 import pytest
 
 from fairlms.metrics import GroupPredictions, ScorePair
-from fairlms.mitigation import ComparisonReport, MetricDelta, compare_before_after
+from fairlms.mitigation import (
+    ComparisonReport,
+    MetricDelta,
+    MetricEvaluation,
+    compare_before_after,
+)
+from fairlms.metrics import AccuracyDisparity, EqualOpportunityGap
 
 
 class TestReporting:
@@ -17,7 +23,13 @@ class TestReporting:
         report = compare_before_after(
             None,
             None,
-            metrics={"accuracy_disparity": ScorePair([1.0, 0.0], [0.0, 1.0])},
+            metrics={
+                "accuracy_disparity": MetricEvaluation(
+                    metric=AccuracyDisparity(),
+                    data=ScorePair([1.0, 0.0], [0.0, 1.0]),
+                    after_data=ScorePair([1.0, 0.0], [0.0, 1.0]),
+                )
+            },
         )
         assert len(report.fairness) == 1
         delta = report.fairness[0]
@@ -49,9 +61,15 @@ class TestSeparationOfConcerns:
             None,
             None,
             metrics={
-                "accuracy_disparity": ScorePair([1.0, 0.0], [0.0, 1.0]),
-                "equal_opportunity_gap": GroupPredictions(
-                    [1, 1, 0], [1, 0, 0], ["A", "B", "A"]
+                "accuracy_disparity": MetricEvaluation(
+                    metric=AccuracyDisparity(),
+                    data=ScorePair([1.0, 0.0], [0.0, 1.0]),
+                    after_data=ScorePair([1.0, 0.0], [0.0, 1.0]),
+                ),
+                "equal_opportunity_gap": MetricEvaluation(
+                    metric=EqualOpportunityGap(),
+                    data=GroupPredictions([1, 1, 0], [1, 0, 0], ["A", "B", "A"]),
+                    after_data=GroupPredictions([1, 1, 0], [1, 0, 0], ["A", "B", "A"]),
                 ),
             },
             utility={"accuracy": lambda model: 0.9},
@@ -149,7 +167,7 @@ class _TinyAdapter(ModelAdapter):
 def _row_sum(adapter):
     """Stand in for a metric: read something off the model's own forward pass."""
     model = adapter.load().model
-    return float(model(torch.tensor([0, 1, 2, 3])).abs().sum())
+    return float(model(torch.tensor([0, 1, 2, 3])).detach().abs().sum())
 
 
 def _projected_pair():
@@ -160,6 +178,7 @@ def _projected_pair():
         method="subspace_projection",
         axis="gender",
         probe_family="test",
+        layer="input_embeddings",
     )
     return base, mitigated
 
@@ -189,6 +208,26 @@ def test_comparison_restores_the_caller_s_base_model():
     compare_before_after(base, mitigated, metrics={}, utility={"probe": _row_sum})
 
     assert _row_sum(base) == untouched
+
+
+def test_preloaded_hook_is_removed_before_baseline_even_when_candidate_fails():
+    base, mitigated = _projected_pair()
+    assert _row_sum(mitigated) == 4.0
+    assert _row_sum(base) == 4.0  # shared model currently has the hook
+
+    def measure(adapter):
+        value = _row_sum(adapter)
+        if adapter is mitigated:
+            raise ValueError("candidate failed after installing its hook")
+        return value
+
+    report = compare_before_after(
+        base, mitigated, metrics={}, utility={"probe": measure}
+    )
+    assert report.utility[0].before == 6.0
+    assert report.utility[0].after is None
+    assert "candidate failed" in report.utility[0].error
+    assert _row_sum(base) == 6.0
 
 
 def test_comparison_tolerates_an_irreversible_mitigated_model():

@@ -7,7 +7,7 @@ order:
 
 >>> from fairlms.metrics.functional import equal_opportunity_gap
 >>> equal_opportunity_gap([1, 1, 0], [1, 0, 0], ["A", "B", "A"], g1="A", g2="B")
-0.5
+1.0
 
 Each returns a bare ``float`` (like ``accuracy_score``). Use the class form when
 you want the full :class:`~fairlms.metrics.base.MetricResult` with diagnostics,
@@ -59,7 +59,7 @@ def equal_opportunity_gap(
     Returns
     -------
     float
-        ``|TPR(g1) - TPR(g2)|``, or ``nan`` when a group has no positives.
+        ``TPR(g1) - TPR(g2)`` (signed; reverse groups to reverse the sign), or ``nan`` when a group has no positives.
     """
     return float(
         EqualOpportunityGap(g1=g1, g2=g2, positive_label=positive_label)

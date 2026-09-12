@@ -95,11 +95,12 @@ CounterfactualRobustness().compute(OpenAIModel(model_name="davinci-002"), pairs)
 
 Install the extra (`pip install "fairlms[openai]"`) and set `OPENAI_API_KEY`.
 
-!!! warning "Legacy completions models"
-    These metrics default to `davinci-002` and `gpt-3.5-turbo-instruct`, both
-    legacy completions endpoints on a deprecation track. Pass `model_name=` /
-    `completion_model=` explicitly and record what you used. A result from a
-    retired endpoint is not reproducible.
+!!! note "Completions transport"
+    These three metrics require `client.completions.create`, with log probabilities
+    for CTF and BA. The adapter's `model_name` is used unless the metric explicitly
+    sets `completion_model`. The result records the effective name. Chat-only
+    clients and local adapters are refused by this backend. Availability of a
+    particular remote model must be checked with the provider.
 
 `sensitive_name_similarity` takes neither: `model` must be a plain callable
 mapping a prompt string to a response string, so you can point it at any
@@ -129,3 +130,6 @@ rather than token distributions, and budget for the variance. Use
 `accuracy_disparity` when you already have per-item correctness from a real
 task. It is the only metric here that measures harm on a task the model was
 actually deployed for.
+
+DRD with no dictionary matches returns `insufficient_evidence`, a NaN score
+and `mention_coverage=0`; JSON exports use `null`, not a parity score.

@@ -89,17 +89,10 @@ class TestCounterfactualRobustness:
         CounterfactualRobustness(completion_model="davinci-002").compute(client, PAIRS)
         assert {call["model"] for call in client.calls} == {"davinci-002"}
 
-    def test_the_retry_loop_repeats_a_successful_call(self):
-        """Pinned as a defect, not as intended behaviour.
-
-        ``_top1_token``'s ``for attempt in range(MAX_RETRIES)`` body contains only
-        the API call and no ``return``, so a request that succeeds first time is
-        still issued four times and only the last response is read. That is four
-        times the cost and latency for the same answer.
-        """
+    def test_successful_calls_are_not_retried(self):
         client = StubOpenAIClient(top_tokens={"nurse": "she", "doctor": "he"})
         CounterfactualRobustness().compute(client, PAIRS)
-        assert len(client.calls) == 8  # 4 retries x 2 prompts, for one pair
+        assert len(client.calls) == 2
 
     def test_pairs_can_be_a_sequence_of_tuples(self):
         client = StubOpenAIClient(top_tokens={"nurse": "she", "doctor": "he"})
@@ -303,7 +296,9 @@ class TestBiasAmplifierScore:
 
     def test_templates_are_checked_for_their_placeholders(self):
         with pytest.raises(ValueError, match=r"missing placeholder\(s\) \{prop\}"):
-            GroupProperties(["men", "women"], ["strong"], "Between {gi} and {gj}", RB_TEMPLATE)
+            GroupProperties(
+                ["men", "women"], ["strong"], "Between {gi} and {gj}", RB_TEMPLATE
+            )
 
     def test_at_least_two_groups_are_required(self):
         with pytest.raises(ValueError, match="at least two groups"):
@@ -394,7 +389,9 @@ class TestTextMatchHelpers:
         assert any_exact_match("Rome", ["London", "paris"]) == 0.0
 
     def test_best_token_f1_takes_the_strongest_reference(self):
-        assert best_token_f1("the red car", ["blue", "a red car"]) == pytest.approx(2 / 3)
+        assert best_token_f1("the red car", ["blue", "a red car"]) == pytest.approx(
+            2 / 3
+        )
 
     def test_best_token_f1_of_no_references_is_zero(self):
         assert best_token_f1("the red car", []) == 0.0
@@ -512,9 +509,11 @@ class TestSensitiveNameSimilarity:
         assert result.details["snsv"] == pytest.approx(0.0)
 
     def test_the_table_records_one_column_per_group(self):
-        table = SensitiveNameSimilarity().compute(
-            self._responder, self._spec()
-        ).details["table"]
+        table = (
+            SensitiveNameSimilarity()
+            .compute(self._responder, self._spec())
+            .details["table"]
+        )
         assert table.loc[0, "sim_men"] == pytest.approx(1.0)
         assert table.loc[0, "sim_women"] == pytest.approx(0.0)
 

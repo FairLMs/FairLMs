@@ -9,8 +9,8 @@ Each benchmark retains its own license. Two are bundled with the package (CrowS-
 | Loader | Description | Data origin | Constructor arguments |
 |---|---|---|---|
 | `BBQ` | Load BBQ examples from bundled (or legacy) jsonl category files. | bundled with the package | `data_dir`, `categories`, `context_condition`, `n_max` |
-| `BiasInBios` | Load the Hugging Face ``LabHC/bias_in_bios`` dataset. | Hugging Face Hub, downloaded at first use | `split`, `n_max`, `hf_path` |
+| `BiasInBios` | Load the Hugging Face ``LabHC/bias_in_bios`` dataset. | Hugging Face Hub, downloaded at first use | `split`, `n_max`, `hf_path`, `revision` |
 | `CrowSPairs` | Load CrowS-Pairs as stereotype / anti-stereotype sentence pairs. | bundled with the package | `path`, `bias_type`, `n_max` |
-| `StereoSet` | Load StereoSet as pairs or triples. | Hugging Face Hub, downloaded at first use | `config`, `split`, `as_triples`, `n_max`, `hf_path`, `label_map` |
-| `WinoBias` | Load WinoBias from Hugging Face. | Hugging Face Hub, downloaded at first use | `config`, `split`, `n_max`, `hf_path` |
-| `XNLIReligionPairs` | Build religion stereotype/anti pairs from XNLI + templates. | Hugging Face Hub, downloaded at first use | `split`, `n_max`, `hf_path`, `include_templates`, `religion_swaps`, `religion_groups`, `templates` |
+| `StereoSet` | Load StereoSet as pairs or triples. | Hugging Face Hub, downloaded at first use | `config`, `split`, `as_triples`, `n_max`, `hf_path`, `label_map`, `revision` |
+| `WinoBias` | Load WinoBias from Hugging Face. | Hugging Face Hub, downloaded at first use | `config`, `split`, `n_max`, `hf_path`, `revision` |
+| `XNLIReligionPairs` | Build religion counterfactual pairs from XNLI + templates. | Hugging Face Hub, downloaded at first use | `split`, `n_max`, `hf_path`, `include_templates`, `religion_swaps`, `religion_groups`, `templates`, `revision` |

@@ -58,9 +58,7 @@ TARGET = "synthetic-gender-reference-suite"
 ROLES = ("stereotype", "anti_stereotype")
 GROUPS = ("feminine", "masculine")
 
-SURFACE_TOKENS = TokenizationRule(
-    mode=TokenizationMode.REGEX, pattern=r"\b[\w_]+\b"
-)
+SURFACE_TOKENS = TokenizationRule(mode=TokenizationMode.REGEX, pattern=r"\b[\w_]+\b")
 
 
 # --------------------------------------------------------------------------
@@ -261,9 +259,10 @@ def test_report_always_carries_all_eight_slots_in_the_frozen_order():
     assert set(report.components) == set(CONSTRUCTION_SLOTS)
     assert len(report.components) == 8
     assert report.provenance["slot_order"] == CONSTRUCTION_SLOTS
-    assert tuple(
-        result.component for result in construction_vector(report)
-    ) == CONSTRUCTION_SLOTS
+    assert (
+        tuple(result.component for result in construction_vector(report))
+        == CONSTRUCTION_SLOTS
+    )
     assert report.provenance["implemented_slots"] == LIGHTWEIGHT_CONSTRUCTION_SLOTS
     assert report.provenance["backend_slots"] == BACKEND_CONSTRUCTION_SLOTS
 
@@ -293,14 +292,13 @@ def test_report_always_carries_all_eight_slots_in_the_frozen_order():
 
 
 def test_all_eight_slots_are_present_with_only_one_evidence_view():
-    report = audit_construction(
-        _evidence(grouped=_grouped()), _spec(), axis=AXIS
-    )
+    report = audit_construction(_evidence(grouped=_grouped()), _spec(), axis=AXIS)
 
     assert set(report.components) == set(CONSTRUCTION_SLOTS)
-    assert tuple(
-        result.component for result in construction_vector(report)
-    ) == CONSTRUCTION_SLOTS
+    assert (
+        tuple(result.component for result in construction_vector(report))
+        == CONSTRUCTION_SLOTS
+    )
     assert _statuses(report)["b_opt"] == "not_applicable"
     assert _reason_codes(report)["b_opt"] == "evidence_view_not_supplied"
 
@@ -408,9 +406,7 @@ def test_a_blocked_backend_slot_does_not_fail_the_report_or_the_other_slots():
 
 
 def test_a_backend_slot_reports_absent_geometry_before_it_names_a_backend():
-    report = audit_construction(
-        _evidence(grouped=_grouped()), _spec(), axis=AXIS
-    )
+    report = audit_construction(_evidence(grouped=_grouped()), _spec(), axis=AXIS)
 
     for slot in ("b_equiv", "b_gram"):
         result = report.components[slot]
@@ -452,9 +448,7 @@ def test_audit_construction_refuses_a_non_slot_or_duplicated_diagnostic():
     assert "duplicate component names" in str(excinfo.value)
 
     with pytest.raises(TypeError):
-        audit_construction(
-            _full_evidence(), _spec(), axis=AXIS, diagnostics=("b_min",)
-        )
+        audit_construction(_full_evidence(), _spec(), axis=AXIS, diagnostics=("b_min",))
 
 
 # --------------------------------------------------------------------------
@@ -640,10 +634,16 @@ def test_b_min_measures_zero_residual_for_an_identity_only_substitution():
     evidence = _evidence(
         paired=_paired(
             (
-                ("mp-001", "he is a nurse who works nights",
-                 "she is a nurse who works nights"),
-                ("mp-002", "his colleagues call him the janitor",
-                 "her colleagues call her the janitor"),
+                (
+                    "mp-001",
+                    "he is a nurse who works nights",
+                    "she is a nurse who works nights",
+                ),
+                (
+                    "mp-002",
+                    "his colleagues call him the janitor",
+                    "her colleagues call her the janitor",
+                ),
             )
         )
     )
@@ -839,12 +839,15 @@ def test_b_opt_reads_declared_roles_and_never_option_position():
 
     # A positional reading of the supplied rows -- first row minus second row
     # within each item -- would answer +3.0 on this fixture.
-    positional = math.fsum(
-        (
-            len(rows[0][2].split()) - len(rows[1][2].split()),
-            len(rows[2][2].split()) - len(rows[3][2].split()),
+    positional = (
+        math.fsum(
+            (
+                len(rows[0][2].split()) - len(rows[1][2].split()),
+                len(rows[2][2].split()) - len(rows[3][2].split()),
+            )
         )
-    ) / 2
+        / 2
+    )
     assert positional == 3.0
 
     diagnostics = (OptionLengthBias(role_contrast=_contrast()),)
@@ -1165,9 +1168,7 @@ def test_b_frame_blocks_a_declared_group_with_no_texts():
 
 
 def test_b_temp_reports_both_the_imbalance_and_the_coverage_ratio():
-    report = audit_construction(
-        _evidence(templates=_templates()), _spec(), axis=AXIS
-    )
+    report = audit_construction(_evidence(templates=_templates()), _spec(), axis=AXIS)
 
     result = report.components["b_temp"]
     details = result.to_dict()["details"]
@@ -1196,9 +1197,7 @@ def test_b_temp_blocks_a_declared_group_with_no_templates():
     assert templates.group_instance_counts["masculine"] == 0
     assert templates.group_unique_template_counts["masculine"] == 0
 
-    report = audit_construction(
-        _evidence(templates=templates), _spec(), axis=AXIS
-    )
+    report = audit_construction(_evidence(templates=templates), _spec(), axis=AXIS)
 
     result = report.components["b_temp"]
     assert result.status is DiagnosticStatus.BLOCKED
@@ -1246,9 +1245,7 @@ def test_no_slot_value_depends_on_the_dataset_name_or_task_family():
     evidence = _full_evidence()
     diagnostics = _full_diagnostics()
 
-    first = audit_construction(
-        evidence, _spec(), axis=AXIS, diagnostics=diagnostics
-    )
+    first = audit_construction(evidence, _spec(), axis=AXIS, diagnostics=diagnostics)
     second = audit_construction(
         evidence,
         _spec(target_name="a-completely-different-benchmark", task_family="qa"),
@@ -1346,9 +1343,7 @@ def test_golden_mixed_construction_vector_fixture_is_portable_and_replays():
                 )
             ),
             FramingDisparity(predicate=SELF_IDENTIFICATION_FRAME),
-            TemplateImbalance(
-                ratio_min_count=fixture["parameters"]["ratio_min_count"]
-            ),
+            TemplateImbalance(ratio_min_count=fixture["parameters"]["ratio_min_count"]),
         ),
     )
 
@@ -1399,9 +1394,10 @@ def test_golden_mixed_construction_vector_fixture_is_portable_and_replays():
     diff_len = fixture["expected"]["components"]["b_diff_len"]
     assert gap / weighted == diff_len["value"]
     assert unweighted == diff_len["cross_check"]["unweighted_mean_of_group_means"]
-    assert gap / unweighted == diff_len["cross_check"][
-        "value_under_unweighted_denominator"
-    ]
+    assert (
+        gap / unweighted
+        == diff_len["cross_check"]["value_under_unweighted_denominator"]
+    )
     assert gap / unweighted != gap / weighted
 
     frame_hits: dict[str, int] = {group: 0 for group in sample_counts}
@@ -1465,7 +1461,10 @@ def test_blocked_slots_do_not_advertise_an_install_that_does_not_exist():
     """`required_extra` pointed at fairlms[construction-backends], which is not
     declared in pyproject.toml. Telling a user to install a nonexistent extra is
     worse than telling them the backend is not implemented yet."""
-    import tomllib
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
     from pathlib import Path
 
     from fairlms.diagnostics import CONSTRUCTION_BACKEND_REQUIREMENTS

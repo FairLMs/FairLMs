@@ -67,11 +67,13 @@ class WinoBias(FairnessDataset):
         split: str = "test",
         n_max: Optional[int] = None,
         hf_path: Optional[str] = None,
+        revision: Optional[str] = None,
     ):
         self.config = config
         self.split = split
         self.n_max = n_max
         self.hf_path = hf_path
+        self.revision = revision
         self._cache: Optional[List[dict]] = None
 
     def _load_hf(self):
@@ -79,20 +81,22 @@ class WinoBias(FairnessDataset):
 
         errors = []
         candidates = (
-            [self.hf_path]
-            if self.hf_path
-            else ["wino_bias", "uclanlp/wino_bias"]
+            [self.hf_path] if self.hf_path else ["wino_bias", "uclanlp/wino_bias"]
         )
         for path in candidates:
             if not path:
                 continue
             try:
-                return load_dataset(path, self.config, split=self.split)
+                loaded = load_dataset(
+                    path, self.config, split=self.split, revision=self.revision
+                )
+                self._resolved_hf_path = path
+                self._resolved_fingerprint = getattr(loaded, "_fingerprint", None)
+                return loaded
             except Exception as exc:  # noqa: BLE001
                 errors.append(f"{path}: {exc}")
         raise RuntimeError(
-            "Failed to load WinoBias from Hugging Face. Tried: "
-            + "; ".join(errors)
+            "Failed to load WinoBias from Hugging Face. Tried: " + "; ".join(errors)
         )
 
     def load(self) -> Sequence[dict]:

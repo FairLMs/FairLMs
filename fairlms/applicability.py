@@ -80,6 +80,7 @@ CAPABILITIES: frozenset = frozenset(
         # the matcher refuse those pairings by name instead of letting them die
         # on a missing ``.tokenizer`` attribute deep inside the metric.
         "local_tokenizer",
+        "completions_api",
     }
 )
 
@@ -197,14 +198,21 @@ TASK_PROFILES: Mapping[str, ModelProfile] = {
         architecture="encoder_only",
         capabilities=frozenset(
             {
-                "local_tokenizer","hidden_states", "attentions", "gradients", "masked_token_scores"}
+                "local_tokenizer",
+                "hidden_states",
+                "attentions",
+                "gradients",
+                "masked_token_scores",
+            }
         ),
         access=AccessLevel.WHITE_BOX,
         task="mlm",
     ),
     "encoder": ModelProfile(
         architecture="encoder_only",
-        capabilities=frozenset({"local_tokenizer", "hidden_states", "attentions", "gradients"}),
+        capabilities=frozenset(
+            {"local_tokenizer", "hidden_states", "attentions", "gradients"}
+        ),
         access=AccessLevel.WHITE_BOX,
         task="encoder",
     ),
@@ -212,7 +220,12 @@ TASK_PROFILES: Mapping[str, ModelProfile] = {
         architecture="encoder_only",
         capabilities=frozenset(
             {
-                "local_tokenizer","hidden_states", "attentions", "gradients", "sequence_logits"}
+                "local_tokenizer",
+                "hidden_states",
+                "attentions",
+                "gradients",
+                "sequence_logits",
+            }
         ),
         access=AccessLevel.WHITE_BOX,
         task="sequence_classification",
@@ -259,7 +272,9 @@ TASK_PROFILES: Mapping[str, ModelProfile] = {
     # two metrics that demonstrably work against it today.
     "openai": ModelProfile(
         architecture="decoder_only",
-        capabilities=frozenset({"free_generation", "token_logprobs"}),
+        capabilities=frozenset(
+            {"free_generation", "token_logprobs", "completions_api"}
+        ),
         access=AccessLevel.BLACK_BOX,
         task="openai",
     ),

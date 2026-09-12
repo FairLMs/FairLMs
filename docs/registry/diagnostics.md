@@ -28,8 +28,8 @@ Every registered diagnostic constructs with zero arguments, which is what `get_d
 
 The 3 slots below depend on an optional backend that this release does not ship. They have no registered class by design: `audit_construction` and `audit_dataset` synthesize a result for each of them instead of registering a stub. The backend is checked **last**, after the precedence every component shares, so a backend slot is `blocked` with the reason code below only when it was requested *and* its required evidence view is present for the audited axis. Otherwise it reports the same non-ready outcome any other component would: `not_applicable` / `component_not_requested`, `not_applicable` / `evidence_view_not_supplied`, `not_applicable` / `target_kind_not_supported`, or whatever a caller override declares. Status alone therefore does not identify a backend slot -- `BACKEND_CONSTRUCTION_SLOTS` and `CONSTRUCTION_BACKEND_REQUIREMENTS` do. A missing backend blocks only its own slot and never the rest of the vector.
 
-| Slot | Required backend | Required view | Reason code | Install extra | Milestone |
+| Slot | Required backend | Required view | Reason code | Availability | Milestone |
 |---|---|---|---|---|---|
-| `b_equiv` | `EmbeddingBackend` | `paired_texts` | `embedding_backend_unavailable` | `fairlms[construction-backends]` | P2C-06 |
-| `b_gram` | `GrammarCheckerBackend` | `paired_texts` | `grammar_backend_unavailable` | `fairlms[construction-backends]` | P2C-06 |
-| `b_diff_dep` | `DependencyParserBackend` | `grouped_texts` | `dependency_parser_backend_unavailable` | `fairlms[construction-backends]` | P2C-06 |
+| `b_equiv` | `EmbeddingBackend` | `paired_texts` | `embedding_backend_unavailable` | `not_implemented_in_this_release` | P2C-06 |
+| `b_gram` | `GrammarCheckerBackend` | `paired_texts` | `grammar_backend_unavailable` | `not_implemented_in_this_release` | P2C-06 |
+| `b_diff_dep` | `DependencyParserBackend` | `grouped_texts` | `dependency_parser_backend_unavailable` | `not_implemented_in_this_release` | P2C-06 |
