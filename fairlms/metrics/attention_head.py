@@ -64,7 +64,7 @@ class GradientBasedBiasEstimation(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("decoder_only",)
     required_task = "causal"
-    requires = frozenset({"gradients", "hidden_states"})
+    requires = frozenset({"gradients", "hidden_states", "local_tokenizer"})
     accepts = (WordSets,)
 
     def __init__(
@@ -162,7 +162,7 @@ class NaturalIndirectEffect(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("decoder_only",)
     required_task = "causal"
-    requires = frozenset({"hidden_states", "token_logprobs"})
+    requires = frozenset({"hidden_states", "token_logprobs", "local_tokenizer"})
     accepts = (ProbeSet,)
 
     def __init__(

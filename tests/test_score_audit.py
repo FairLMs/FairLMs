@@ -311,7 +311,7 @@ def test_score_report_is_strict_json_schema_1_4():
     report = audit_scores(_evidence(), _spec())
     payload = report.to_dict()
 
-    assert payload["schema_version"] == "1.4"
+    assert payload["schema_version"] == "1.7"
     assert payload["status"] == "success"
     assert math.isfinite(payload["components"]["score_mean_gap"]["value"])
     assert report.to_json(indent=None) == report.to_json(indent=None)

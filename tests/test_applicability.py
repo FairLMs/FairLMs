@@ -268,3 +268,66 @@ class TestMetricRetrofit:
                 Exploding(**kwargs),
                 WordSets(["man"], ["woman"], ["career"], ["family"]),
             )
+
+
+# --- regression: tokenizer-dependent metrics are refused by name over an API --
+#
+# Four metrics declared only `free_generation` or `token_logprobs`, both of
+# which the openai profile grants, yet their implementations call
+# resolve.get_tokenizer_model and then tokenize themselves. They were admitted
+# by the matcher and died later on a bare
+# `AttributeError: 'OpenAILoadedModel' object has no attribute 'tokenizer'`,
+# which is precisely the deep failure the declaration contract exists to
+# replace.
+
+
+@pytest.mark.parametrize(
+    "metric_name",
+    [
+        "cooccurrence_association",
+        "demographic_next_token_proportion",
+        "demographic_representation_divergence",
+        "stereotypical_log_likelihood",
+    ],
+)
+def test_tokenizer_dependent_metrics_are_refused_over_an_api(metric_name):
+    from fairlms.applicability import ApplicabilityError, check_applicability
+    from fairlms.metrics import METRIC_REGISTRY
+    from fairlms.models.openai import OpenAILoadedModel
+
+    served = OpenAILoadedModel(name="gpt-x", client=object(), model="gpt-x")
+
+    with pytest.raises(ApplicabilityError) as excinfo:
+        check_applicability(METRIC_REGISTRY[metric_name](), served)
+    assert "local_tokenizer" in str(excinfo.value)
+
+
+def test_local_profiles_all_grant_a_local_tokenizer():
+    """Declaring local_tokenizer must not refuse any locally loaded model."""
+    from fairlms.applicability import TASK_PROFILES
+
+    for task, profile in TASK_PROFILES.items():
+        if task == "openai":
+            assert "local_tokenizer" not in profile.capabilities
+        else:
+            assert "local_tokenizer" in profile.capabilities, task
+
+
+def test_every_metric_that_resolves_a_tokenizer_declares_it():
+    """The vocabulary describes the code: if a metric calls
+    get_tokenizer_model and requires a specific head, it declares the need."""
+    import inspect
+
+    from fairlms.metrics import METRIC_REGISTRY
+
+    for name, cls in sorted(METRIC_REGISTRY.items()):
+        module = inspect.getmodule(cls)
+        try:
+            source = inspect.getsource(module)
+        except OSError:  # pragma: no cover
+            continue
+        if "get_tokenizer_model" not in source:
+            continue
+        if getattr(cls, "required_task", None) is None:
+            continue  # model-optional: runs on precomputed outputs too
+        assert "local_tokenizer" in (getattr(cls, "requires", ()) or ()), name

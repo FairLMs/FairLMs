@@ -37,3 +37,16 @@ site/
 
 # mkdocs-jupyter render cache
 .cache/
+
+# Local repair delivery materials
+/FIXES.md
+/validation/
+/data-cleanup.json
+/legacy-results/
+
+# Local secrets
+.env.*
+!.env.example
+
+# Notebook checkpoints
+.ipynb_checkpoints/

@@ -144,7 +144,7 @@ class WEAT(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "encoder"
-    requires = frozenset({"hidden_states"})
+    requires = frozenset({"hidden_states", "local_tokenizer"})
     accepts = (WordSets, VectorSets)
 
     def __init__(
@@ -278,7 +278,7 @@ class SEAT(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "encoder"
-    requires = frozenset({"hidden_states"})
+    requires = frozenset({"hidden_states", "local_tokenizer"})
     accepts = (WordSets,)
 
     def __init__(
@@ -385,7 +385,7 @@ class CEAT(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "encoder"
-    requires = frozenset({"hidden_states"})
+    requires = frozenset({"hidden_states", "local_tokenizer"})
     accepts = (ContextSets,)
 
     def __init__(

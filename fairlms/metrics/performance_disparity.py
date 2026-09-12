@@ -36,7 +36,9 @@ class AccuracyDisparity(FairnessMetric):
     def compute(
         self, model: Any = None, data: Any = None, **legacy: Any
     ) -> MetricResult:
-        data = unwrap(data if data is not None else legacy.pop("dataset", None), ScorePair)
+        data = unwrap(
+            data if data is not None else legacy.pop("dataset", None), ScorePair
+        )
 
         if not isinstance(data, ScorePair):
             s, k1 = take(legacy, "scores_s")
@@ -90,10 +92,10 @@ class BiasAmplifierScore(FairnessMetric):
     name = "bias_amplifier"
     bias_type = "extrinsic"
     architectures = ("decoder_only",)
-    requires = frozenset({"token_logprobs"})
+    requires = frozenset({"token_logprobs", "completions_api"})
     accepts = (GroupProperties,)
 
-    def __init__(self, *, completion_model: str = "davinci-002"):
+    def __init__(self, *, completion_model: str | None = None):
         self.completion_model = completion_model
 
     def compute(
@@ -124,10 +126,10 @@ class BiasAmplifierScore(FairnessMetric):
             legacy.pop("max_new_tokens")
         self._reject_unknown_kwargs(legacy, "completion_model")
 
-        bundle = get_openai_bundle(model)
-        completion_model = legacy.get(
-            "completion_model", self.completion_model
-        ) or bundle.model
+        bundle = get_openai_bundle(model, metric=self)
+        completion_model = (
+            legacy.get("completion_model", self.completion_model) or bundle.model
+        )
         ab, rb, ab_rows, rb_rows = compute_ba(
             bundle.client,
             list(data.groups),
@@ -175,7 +177,9 @@ class SensitiveNameSimilarity(FairnessMetric):
     def compute(
         self, model: Any = None, data: Any = None, **legacy: Any
     ) -> MetricResult:
-        data = unwrap(data if data is not None else legacy.pop("dataset", None), QuerySpec)
+        data = unwrap(
+            data if data is not None else legacy.pop("dataset", None), QuerySpec
+        )
 
         if not isinstance(data, QuerySpec):
             queries, k1 = take(legacy, "queries")

@@ -1,3 +1,7 @@
-recursive-include tests/data/golden *.json
-recursive-include docs *.md
+include README.md LICENSE CITATION.cff CONVERSION.md mkdocs.yml requirements.txt
+recursive-include tests *.py *.json
+recursive-include scripts *.py
+recursive-include docs *.md *.ipynb
 recursive-include examples *.md *.py
+include requirements-tested.txt
+recursive-include fairlms/data *.md *.json

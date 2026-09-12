@@ -141,7 +141,9 @@ class TestGetTokenizerModel:
 
 class TestGetOpenAIBundle:
     def test_loaded_bundle_passes_through(self):
-        bundle = OpenAILoadedModel(name="x", client=StubOpenAIClient(), model="davinci-002")
+        bundle = OpenAILoadedModel(
+            name="x", client=StubOpenAIClient(), model="davinci-002"
+        )
         assert get_openai_bundle(bundle) is bundle
 
     def test_adapter_is_loaded(self):
@@ -158,11 +160,12 @@ class TestGetOpenAIBundle:
         assert bundle.client is client
         assert bundle.model == "davinci-002"
 
-    def test_chat_only_client_is_also_recognised(self):
+    def test_chat_only_client_is_refused_before_request(self):
         class ChatClient:
             chat = object()
 
-        assert get_openai_bundle(ChatClient()).model == "davinci-002"
+        with pytest.raises(TypeError, match="OpenAI"):
+            get_openai_bundle(ChatClient())
 
     def test_unrelated_object_is_reported(self):
         with pytest.raises(TypeError, match="Pass an OpenAIModel"):

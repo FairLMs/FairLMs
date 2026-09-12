@@ -86,6 +86,7 @@ Users then upgrade with `pip install --upgrade fairlms`.
 
 | Version | Change | Migration |
 |---------|--------|-----------|
+| 0.5.0.dev0 | Correct StereoSet roles/context; explicit projection layer/pair IDs; generation-only SelfDebiasing; XNLI counterfactual schema; undefined DRD; explicit comparison evidence | See the [changelog](docs/changelog.md); recompute affected results |
 | 0.4.0 | WEAT/SEAT sample permutations from a call-local generator, so `np.random.seed(...)` no longer pins their p-values | Pass the seed as config: `WEAT(seed=0)`, `SEAT(seed=0)`. Seeded p-values differ from pre-0.4.0 values for the same nominal seed (PCG64 vs Mersenne Twister); effect sizes are unaffected |
 | 0.3.0 | Project renamed `fairllms` → `fairlms` | `pip install fairlms`, `import fairlms` |
 | 0.2.0 | Package renamed `fairLLMs` → `fairllms` (PEP 8) | `import fairllms` |
@@ -207,6 +208,21 @@ evidence is never represented as a score of zero.
 The first diagnostic is axis-level representativeness (`b_rep`): smoothed
 `KL(observed || reference)` in nats. It requires an explicit reference and its
 provenance; the package does not infer a population prior from a dataset name.
+
+Alongside it, `b_leak` measures group-trait association as smoothed normalized
+mutual information over a declared lexicon pair space, and `b_constr` is
+published as a vector of eight independent construction slots (`b_min`,
+`b_equiv`, `b_gram`, `b_diff_len`, `b_diff_dep`, `b_frame`, `b_opt`, `b_temp`)
+with no aggregate score. The three backend-dependent slots are never registered
+as stubs: each is synthesized as a non-ready result, `blocked` with a backend
+reason code when the slot was requested and its required evidence view is
+present, and otherwise `not_applicable` for the ordinary reason (not requested,
+unsupported target kind, or view not supplied) -- `BACKEND_CONSTRUCTION_SLOTS`
+and `CONSTRUCTION_BACKEND_REQUIREMENTS`, not the status, name the slots that
+need a backend. `audit_dataset(evidence, spec, axis=...)` runs the requested
+components over one axis of a `DatasetEvidence` and returns one report, while
+`audit_scores` remains the separate entry point for row-level scores. See the
+[dataset audit guide](docs/guides/dataset-audit.md).
 
 ```python
 from fairlms.diagnostics import (

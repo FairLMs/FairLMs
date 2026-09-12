@@ -78,6 +78,7 @@ openai = [
 dev = [
     "pytest>=7.0",
     "pytest-cov",
+    "tomli>=2.0; python_version < '3.11'",
     "fairlms[openai]",
 ]
 all = [
@@ -108,6 +109,9 @@ filterwarnings = [
     "ignore::DeprecationWarning:importlib._bootstrap",
 ]
 
+[tool.black]
+target-version = ["py310"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["fairlms*"]
@@ -118,6 +122,9 @@ include = ["fairlms*"]
 # `fairlms.data` for that reason. The older `fairlms = ["data/bbq/*.jsonl"]`
 # form still resolves on setuptools>=77, so this is correctness, not a fix.
 "fairlms.data" = [
+    "README.md",
+    "NOTICE.md",
+    "checksums.json",
     "crows_pairs/*.csv",
     "bbq/*.jsonl",
 ]

@@ -117,18 +117,24 @@ equalised the rates by refusing to decide anything.
 
 ## Intra-processing: the result is a model
 
-An intra-processing result *is* a `ModelAdapter`, so any registered metric
-re-evaluates the mitigated model with no modification:
+An intra-processing result is a `ModelAdapter`. Metrics that require only
+capabilities exposed by the edited adapter can use the same compute interface.
+Projection evidence must declare its representation layer and pair IDs:
 
 ```python
 from fairlms.metrics import METRIC_REGISTRY
 from fairlms.mitigation import SubspaceProjection
 
-mitigated = SubspaceProjection().apply(base_model, pairs).result
+# vectors: AttributeLabeledVectors with representation_layer and pair_ids;
+# the declared layer must be the layer used to collect the vectors.
+mitigated = SubspaceProjection().apply(base_model, vectors).result
 
 weat = METRIC_REGISTRY["weat"]()        # taken straight from the registry
 before = float(weat.compute(base_model, word_sets))
-after = float(weat.compute(mitigated, word_sets))
+try:
+    after = float(weat.compute(mitigated, word_sets))
+finally:
+    mitigated.remove()
 ```
 
 !!! warning "Report removal relative to the probe family"
@@ -187,12 +193,18 @@ it is declared decoder-only and encoder-decoder and refused elsewhere.
 ## Comparing before and after
 
 ```python
-from fairlms.mitigation import compare_before_after
+from fairlms.mitigation import MetricEvaluation, compare_before_after
+from fairlms.metrics import WEAT, EqualOpportunityGap
 
 report = compare_before_after(
     base_model,
     mitigated_model,
-    metrics={"weat": word_sets, "equal_opportunity_gap": predictions},
+    metrics={
+        "weat": MetricEvaluation(metric=WEAT(seed=0), data=word_sets),
+        "equal_opportunity_gap": MetricEvaluation(
+            metric=EqualOpportunityGap(g1="A", g2="B", positive_label=1),
+            data=before_predictions, after_data=after_predictions),
+    },
     utility={"accuracy": my_accuracy_fn},
 )
 report.to_dict()
@@ -208,8 +220,23 @@ Three rules the report enforces:
   aggregation exists, so `ComparisonReport` has no `__float__` and exposes no
   overall number.
 
-A metric that raises is recorded with its error rather than dropped, so a partial
-comparison is visibly partial.
+A failed or undefined metric is retained with a reason and a `null` score.
+Each phase records the configured metric and evidence checksum. A precomputed
+metric requires explicit `after_data` or `evidence_factory(model)`; passing a
+second model cannot regenerate predictions. A delta is `after - before`, not an
+automatic judgment of improvement (the equal opportunity gap is signed).
+
+Projection hooks share the underlying model and must not run concurrently with
+a baseline. The comparison helper removes an existing hook before the baseline
+and cleans up after the candidate phase, including after metric failures.
+
+SelfDebiasing exposes edited free generation (greedy and nucleus sampling).
+Token-log-probability and activation metrics are refused on this adapter. All
+diagnostic prefixes contribute probability-based damping. Beam search and KV
+caching are not implemented; context limits are checked before generation.
+
+INLP evaluates a new probe on the final projected vectors. The held-out split
+is used for stopping, so it is a validation split, not an independent test set.
 
 ## Not provided
 

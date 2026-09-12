@@ -18,6 +18,7 @@ class LoadedModel:
     model: Any
     device: torch.device
     task: str
+    profile: Any = None
 
     def to(self, device: torch.device) -> "LoadedModel":
         self.model.to(device)

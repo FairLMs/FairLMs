@@ -61,6 +61,14 @@ class _PairMetric(FairnessMetric):
             "a dataset or sequence of stereotype/anti-stereotype pairs",
         )
         require_mapping_keys(pairs, type(self).__name__, *_PAIR_KEYS)
+        for index, pair in enumerate(pairs):
+            if any(
+                not isinstance(pair[key], str) or not pair[key].strip()
+                for key in _PAIR_KEYS
+            ):
+                raise ValueError(
+                    f"{type(self).__name__}: pair {index} needs non-empty sentence strings."
+                )
         return pairs
 
     def _run(self, model, pairs, tokenizer, **compute_kwargs) -> MetricResult:
@@ -101,9 +109,15 @@ class CrowSPairsScore(_PairMetric):
 
     name = "crows_pairs_score"
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = RECORD_CORPUS
     _compute_fn = staticmethod(compute_cps)
+
+    def __init__(self, *, batch_size: int = 16):
+        self.batch_size = batch_size
+
+    def _compute_kwargs(self, legacy: dict) -> dict:
+        return {"batch_size": self.batch_size}
 
 
 class PseudoLogLikelihoodScore(_PairMetric):
@@ -111,9 +125,15 @@ class PseudoLogLikelihoodScore(_PairMetric):
 
     name = "pseudo_log_likelihood_score"
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = RECORD_CORPUS
     _compute_fn = staticmethod(compute_pll)
+
+    def __init__(self, *, batch_size: int = 16):
+        self.batch_size = batch_size
+
+    def _compute_kwargs(self, legacy: dict) -> dict:
+        return {"batch_size": self.batch_size}
 
 
 class AllUnmaskedLikelihoodScore(_PairMetric):
@@ -128,7 +148,7 @@ class AllUnmaskedLikelihoodScore(_PairMetric):
 
     name = "all_unmasked_likelihood_score"
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = RECORD_CORPUS
     _compute_fn = staticmethod(compute_aul)
     _extra_allowed = ("use_attention",)
@@ -145,7 +165,7 @@ class AllUnmaskedLikelihoodAttentionScore(_PairMetric):
 
     name = "all_unmasked_likelihood_attention_score"
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores", "attentions"})
+    requires = frozenset({"masked_token_scores", "attentions", "local_tokenizer"})
     accepts = RECORD_CORPUS
     _compute_fn = staticmethod(compute_aula)
     _extra_allowed = ("use_attention",)
@@ -168,7 +188,7 @@ class ContextAssociationTestScore(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = (SentenceTriples,)
 
     def compute(
@@ -217,8 +237,18 @@ class ContextAssociationTestScore(FairnessMetric):
             list(data.stereotype),
             list(data.anti_stereotype),
             list(data.unrelated),
+            contexts=data.contexts,
         )
         return MetricResult(
             score=float(icat),
-            details={"ss": ss, "lms": lms, "icat": float(icat), "rows": rows, "n": len(data)},
+            details={
+                "ss": ss,
+                "lms": lms,
+                "icat": float(icat),
+                "rows": rows,
+                "n": len(data),
+                "scoring_protocol": "sum of candidate-token masked PLL; condition on scoring_context when supplied",
+                "aggregation": "micro over input triples (not the official StereoSet per-target macro aggregation)",
+                "lms_comparisons_per_triple": 2,
+            },
         )

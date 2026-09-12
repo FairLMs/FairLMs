@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.5.0.dev0
+
+Corrected StereoSet roles/context and CAT LMS comparisons; connected public
+SelfDebiasing generation to probability damping; required projection layer and
+pair identity; measured INLP after the final projection; preserved API model
+selection and stopped successful retries. XNLI now produces deduplicated
+counterfactual evidence. Added configured before/after evaluation, JSON-safe
+undefined scores, run provenance, revision controls, real offline model tests,
+source archive validation, and corpus checksums/attribution. No upstream release
+or paper update is implied by this development version.
+
+**Bundled corpora consolidated.** 84 files under `fairlms/definition/` that were
+byte-identical to a copy under `fairlms/data/` were deleted, removing
+359,582,594 bytes. `fairlms/data/` is now the single source, and
+`fairlms/data/checksums.json` pins the bytes that remain. Loaders resolve
+`fairlms/data/` first and still fall back to legacy locations, so externally
+maintained checkouts are unaffected. Historical MCD outputs from earlier
+development are no longer distributed; they were never validation results for
+this version.
+
+
 Versions follow the scheme described in the
 [README](https://github.com/michaellarionov/FairLMs#versioning): while the
 package is pre-1.0, the minor version moves on behaviour changes and the patch

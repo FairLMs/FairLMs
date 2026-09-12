@@ -45,9 +45,14 @@ Six benchmark loaders (CrowS-Pairs, BBQ, StereoSet, Bias in Bios, WinoBias,
 XNLI) fill the same `data` argument you can pass by hand, plus eight bundled
 WEAT / SEAT word sets.
 
-Five dataset diagnostics: axis representativeness (`b_rep`) and four scoring
-instrument audits (mean gap, rate gap, Wasserstein-1 gap, counterfactual
-sensitivity).
+Eleven dataset diagnostics: axis representativeness (`b_rep`), stereotype
+leakage (`b_leak`), five of the eight construction-vector slots (`b_min`,
+`b_diff_len`, `b_frame`, `b_opt`, `b_temp`) and four scoring-instrument audits
+(mean gap, rate gap, Wasserstein-1 gap, counterfactual sensitivity). The three
+remaining construction slots need an optional backend; rather than being
+registered as stubs they are synthesized as non-ready results -- `blocked` with
+a backend reason code once the slot is requested and its required evidence view
+is present, and `not_applicable` before that.
 
 !!! note "Status"
     MIT licensed. Declared support: Python 3.10–3.13. CI runs the test suite on

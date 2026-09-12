@@ -278,3 +278,85 @@ def test_mitigator_follows_the_parameter_protocol(name, cls):
         )
     params = mitigator.get_params(deep=False)
     assert type(mitigator)(**params).get_params(deep=False) == params
+
+
+def test_discovery_of_correlations_reaches_its_declaration_check():
+    """Regression: _as_pipeline was a staticmethod that referenced ``self``.
+
+    Every path that built a pipeline from a plain masked LM raised
+    ``NameError: name 'self' is not defined`` before the metric's own
+    ``requires``/``required_task`` declarations could be consulted, so the
+    applicability contract was unreachable for this metric.
+    """
+    from fairlms.metrics.data import GroupWordPairs
+    from fairlms.models.base import LoadedModel
+
+    metric = METRIC_REGISTRY["discovery_of_correlations"]()
+    evidence = GroupWordPairs(["he", "man"], ["she", "woman"])
+
+    class _NotAModel:
+        pass
+
+    loaded = LoadedModel(
+        name="stub",
+        tokenizer=object(),
+        model=_NotAModel(),
+        device="cpu",
+        task="mlm",
+    )
+    with pytest.raises(Exception) as excinfo:
+        metric.compute(loaded, evidence)
+    assert not isinstance(excinfo.value, NameError), excinfo.value
+
+
+def test_bias_amplifier_refuses_to_score_when_no_call_succeeded(monkeypatch):
+    """Regression: a dead API key produced a clean, plausible 0.5.
+
+    ``_favours`` scored an unanswered forced choice as a tie and ``_agrees``
+    scored it as "No", so a run in which every single call failed averaged out
+    to 0.5 for absolute bias, which is exactly the value a perfectly unbiased
+    model produces. A fairness library must not fabricate that number.
+    """
+    from fairlms.metrics.data import GroupProperties
+    from fairlms.models.openai import OpenAILoadedModel
+
+    from fairlms.definition.decoder_only.extrinsic_bias.performance_disparity.ba import (
+        ba as ba_module,
+    )
+
+    monkeypatch.setattr(ba_module, "MAX_RETRIES", 1)  # no backoff: it is dead
+
+    class _DeadClient:
+        class completions:
+            @staticmethod
+            def create(*args, **kwargs):
+                raise RuntimeError("401 Unauthorized")
+
+    evidence = GroupProperties(
+        groups=["men", "women"],
+        properties=["ambitious"],
+        ab_template="Between {gi} and {gj}, who is more {prop}?",
+        rb_template="Is {g} {prop}?",
+    )
+    served = OpenAILoadedModel(name="gpt-x", client=_DeadClient(), model="gpt-x")
+
+    with pytest.raises(RuntimeError, match="never answered"):
+        METRIC_REGISTRY["bias_amplifier"]().compute(served, evidence)
+
+
+def test_bias_amplifier_distinguishes_a_failed_call_from_a_tie(monkeypatch):
+    """A failed comparison is excluded, not counted as half a preference."""
+    from fairlms.definition.decoder_only.extrinsic_bias.performance_disparity.ba import (
+        ba as ba_module,
+    )
+
+    monkeypatch.setattr(ba_module, "MAX_RETRIES", 1)
+
+    class _Dead:
+        class completions:
+            @staticmethod
+            def create(*args, **kwargs):
+                raise RuntimeError("down")
+
+    assert ba_module._favours(_Dead(), "p", "a", "b") is None
+    assert ba_module._agrees(_Dead(), "p") is None

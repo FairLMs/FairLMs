@@ -89,17 +89,10 @@ class TestCounterfactualRobustness:
         CounterfactualRobustness(completion_model="davinci-002").compute(client, PAIRS)
         assert {call["model"] for call in client.calls} == {"davinci-002"}
 
-    def test_the_retry_loop_repeats_a_successful_call(self):
-        """Pinned as a defect, not as intended behaviour.
-
-        ``_top1_token``'s ``for attempt in range(MAX_RETRIES)`` body contains only
-        the API call and no ``return``, so a request that succeeds first time is
-        still issued four times and only the last response is read. That is four
-        times the cost and latency for the same answer.
-        """
+    def test_successful_calls_are_not_retried(self):
         client = StubOpenAIClient(top_tokens={"nurse": "she", "doctor": "he"})
         CounterfactualRobustness().compute(client, PAIRS)
-        assert len(client.calls) == 8  # 4 retries x 2 prompts, for one pair
+        assert len(client.calls) == 2
 
     def test_pairs_can_be_a_sequence_of_tuples(self):
         client = StubOpenAIClient(top_tokens={"nurse": "she", "doctor": "he"})
@@ -255,15 +248,41 @@ class TestBiasAmplifierScore:
         )
         assert result.details["rb"] == pytest.approx(0.0)
 
-    def test_an_unanswerable_prompt_is_a_tie_and_a_disagreement(self):
-        """Every candidate scoring ``-inf`` means the model gave nothing usable."""
+    def test_an_unanswerable_prompt_is_not_scored_as_a_tie(self):
+        """Every candidate scoring ``-inf`` means the model gave nothing usable.
+
+        This test previously asserted the opposite: that "nothing usable" was
+        recorded as a tie for absolute bias and as a disagreement for relative
+        bias. Scoring a non-observation as an observation is what let a dead API
+        key average out to ``ab == 0.5``, the value a perfectly unbiased model
+        produces, and to ``rb == 0.0``, the value a perfectly consistent one
+        produces. Both are fabrications.
+
+        The expectation was changed because it contradicted the library's own
+        contract. ``DiagnosticStatus.NOT_APPLICABLE`` exists so that unavailable
+        evidence is never serialized as a computed zero; a metric that turns an
+        unanswered prompt into a number breaks the same rule the diagnostics
+        layer is built to enforce. A genuine tie, meaning two finite and equal
+        scores, is untouched and still reported as a tie.
+        """
         client = StubOpenAIClient(token_score_fn=lambda word, prompt: float("-inf"))
+        with pytest.raises(RuntimeError, match="never answered"):
+            BiasAmplifierScore().compute(
+                client,
+                GroupProperties(["men", "women"], ["strong"], AB_TEMPLATE, RB_TEMPLATE),
+            )
+
+    def test_a_partially_answerable_run_still_reports_what_was_observed(self):
+        """One dead comparison must not discard the comparisons that worked."""
+        dead_for_women = lambda word, prompt: (
+            float("-inf") if "women" in prompt and "Is " in prompt else 0.0
+        )
+        client = StubOpenAIClient(token_score_fn=dead_for_women)
         result = BiasAmplifierScore().compute(
             client,
             GroupProperties(["men", "women"], ["strong"], AB_TEMPLATE, RB_TEMPLATE),
         )
-        assert result.details["ab_rows"][0]["favours"] == "tie"
-        assert all(row["agreed"] == 0.0 for row in result.details["rb_rows"])
+        assert result.details["ab"] is not None
 
     def test_completion_model_is_forwarded(self):
         """``completion_model`` previously had no effect on the requests."""
@@ -277,7 +296,9 @@ class TestBiasAmplifierScore:
 
     def test_templates_are_checked_for_their_placeholders(self):
         with pytest.raises(ValueError, match=r"missing placeholder\(s\) \{prop\}"):
-            GroupProperties(["men", "women"], ["strong"], "Between {gi} and {gj}", RB_TEMPLATE)
+            GroupProperties(
+                ["men", "women"], ["strong"], "Between {gi} and {gj}", RB_TEMPLATE
+            )
 
     def test_at_least_two_groups_are_required(self):
         with pytest.raises(ValueError, match="at least two groups"):
@@ -368,7 +389,9 @@ class TestTextMatchHelpers:
         assert any_exact_match("Rome", ["London", "paris"]) == 0.0
 
     def test_best_token_f1_takes_the_strongest_reference(self):
-        assert best_token_f1("the red car", ["blue", "a red car"]) == pytest.approx(2 / 3)
+        assert best_token_f1("the red car", ["blue", "a red car"]) == pytest.approx(
+            2 / 3
+        )
 
     def test_best_token_f1_of_no_references_is_zero(self):
         assert best_token_f1("the red car", []) == 0.0
@@ -486,9 +509,11 @@ class TestSensitiveNameSimilarity:
         assert result.details["snsv"] == pytest.approx(0.0)
 
     def test_the_table_records_one_column_per_group(self):
-        table = SensitiveNameSimilarity().compute(
-            self._responder, self._spec()
-        ).details["table"]
+        table = (
+            SensitiveNameSimilarity()
+            .compute(self._responder, self._spec())
+            .details["table"]
+        )
         assert table.loc[0, "sim_men"] == pytest.approx(1.0)
         assert table.loc[0, "sim_women"] == pytest.approx(0.0)
 
