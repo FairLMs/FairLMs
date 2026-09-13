@@ -105,6 +105,13 @@ PUBLIC_NAMES = {
     "OptionLengthBias",
     "FramingDisparity",
     "TemplateImbalance",
+    # The backend-dependent construction slots and the protocols they accept.
+    "SemanticEquivalence",
+    "GrammarConsistency",
+    "DependencyDepthDisparity",
+    "EmbeddingBackend",
+    "GrammarCheckerBackend",
+    "DependencyParserBackend",
     "audit_construction",
     # The multi-evidence aggregate entry point.
     "DatasetAudit",
@@ -465,8 +472,11 @@ def test_report_rejects_nonportable_top_level_provenance(bad):
 def test_diagnostic_registry_is_separate_from_model_metric_registry():
     assert DIAGNOSTIC_REGISTRY is not METRIC_REGISTRY
     assert list_diagnostics() == [
+        "b_diff_dep",
         "b_diff_len",
+        "b_equiv",
         "b_frame",
+        "b_gram",
         "b_leak",
         "b_min",
         "b_opt",
@@ -477,10 +487,11 @@ def test_diagnostic_registry_is_separate_from_model_metric_registry():
         "score_rate_gap",
         "score_wasserstein_1_gap",
     ]
-    # D032: the three backend-dependent construction slots have no
-    # implementation in this release, so nothing is registered for them.
+    # The three backend-dependent construction slots are registered classes
+    # that take an optional backend; without one they block by name.
     for slot in ("b_equiv", "b_gram", "b_diff_dep"):
-        assert slot not in DIAGNOSTIC_REGISTRY
+        assert slot in DIAGNOSTIC_REGISTRY
+        assert get_diagnostic(slot).backend is None
     assert "b_rep" in DIAGNOSTIC_REGISTRY
     assert "score_counterfactual_sensitivity" in DIAGNOSTIC_REGISTRY
     assert "score_mean_gap" in DIAGNOSTIC_REGISTRY

@@ -84,11 +84,13 @@ nav:
       - Models: api/models.md
       - Containers: api/containers.md
       - Diagnostics: api/diagnostics.md
+      - Diagnostic backends: api/backends.md
       - Mitigation: api/mitigation.md
       - Applicability: api/applicability.md
       - Loaders: api/loaders.md
       - Utils: api/utils.md
   - About:
+      - Comparison with related tools: comparison.md
       - Changelog: changelog.md
       - Citing FairLMs: citation.md
       - License: license.md

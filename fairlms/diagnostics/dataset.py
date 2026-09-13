@@ -37,6 +37,9 @@ from .base import (
     DiagnosticStatus,
 )
 from .construction import (
+    DependencyDepthDisparity,
+    GrammarConsistency,
+    SemanticEquivalence,
     BACKEND_BLOCKED_WARNING,
     BACKEND_CONSTRUCTION_SLOTS,
     CONSTRUCTION_SLOTS,
@@ -50,7 +53,6 @@ from .construction import (
     OptionLengthBias,
     TemplateImbalance,
     _SLOT_VIEWS,
-    _backend_slot_result,
     _component_override,
     _non_ready_result,
     _protected_axes,
@@ -116,6 +118,9 @@ _IMPLEMENTED_CLASSES: Final[Mapping[str, type]] = MappingProxyType(
         "b_frame": FramingDisparity,
         "b_opt": OptionLengthBias,
         "b_temp": TemplateImbalance,
+        "b_equiv": SemanticEquivalence,
+        "b_gram": GrammarConsistency,
+        "b_diff_dep": DependencyDepthDisparity,
     }
 )
 
@@ -302,11 +307,6 @@ def _normalize_diagnostics(
                 f"diagnostics[{index}].name {name!r} is not in "
                 "spec.requested_components."
             )
-        if name in BACKEND_CONSTRUCTION_SLOTS:
-            raise ValueError(
-                f"{name!r} has no implementation in this release; it is "
-                "produced as a blocked slot and is implemented in P2C-06."
-            )
         if name in SCORE_COMPONENTS:
             raise ValueError(
                 f"diagnostics[{index}].name {name!r} audits row-level scorer "
@@ -447,15 +447,6 @@ class DatasetAudit:
 
         if component in SCORE_COMPONENTS:
             result = _score_component_result(component, axis=axis)
-            return _Resolution(
-                component=component, plan=_plan_from_result(result), result=result
-            )
-
-        if component in BACKEND_CONSTRUCTION_SLOTS:
-            view = getattr(self.evidence, _SLOT_VIEWS[component]).get(axis)
-            result = _backend_slot_result(
-                component, spec=spec, axis=axis, view_present=view is not None
-            )
             return _Resolution(
                 component=component, plan=_plan_from_result(result), result=result
             )
@@ -638,6 +629,7 @@ class DatasetAudit:
                 for slot in BACKEND_CONSTRUCTION_SLOTS
                 if slot in results
                 and results[slot].status is DiagnosticStatus.BLOCKED
+                and (results[slot].reason_code or "").endswith("_backend_unavailable")
             ]
             if blocked:
                 ordered = [slot for slot in CONSTRUCTION_SLOTS if slot in blocked]

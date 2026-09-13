@@ -90,11 +90,15 @@ _OPTION_ROWS = (
 )
 
 #: Every diagnostic that is actually implemented, and the class that implements
-#: it.  A stub, a backend placeholder or an unimplemented slot must never
-#: appear here or in ``DIAGNOSTIC_REGISTRY``.
+#: it.  A stub or an unimplemented slot must never appear here or in
+#: ``DIAGNOSTIC_REGISTRY``; the three backend-dependent slots are real classes
+#: that block by name until a backend is supplied.
 _IMPLEMENTED_DIAGNOSTICS = {
+    "b_diff_dep": "DependencyDepthDisparity",
     "b_diff_len": "LengthDisparity",
+    "b_equiv": "SemanticEquivalence",
     "b_frame": "FramingDisparity",
+    "b_gram": "GrammarConsistency",
     "b_leak": "StereotypeLeakage",
     "b_min": "MinimalPairResidual",
     "b_opt": "OptionLengthBias",
@@ -703,13 +707,15 @@ def test_registry_holds_exactly_the_implemented_diagnostics_and_no_stub():
         assert isinstance(instance, registered)
         assert callable(instance.plan) and callable(instance.compute)
 
-    # The three backend-dependent slots are synthesized as blocked results and
-    # must never be registered.
-    assert not set(DIAGNOSTIC_REGISTRY) & set(BACKEND_CONSTRUCTION_SLOTS)
+    # The three backend-dependent slots are real classes and are registered;
+    # default-constructed they block by name for their missing backend.
+    assert set(BACKEND_CONSTRUCTION_SLOTS) <= set(DIAGNOSTIC_REGISTRY)
+    for slot in BACKEND_CONSTRUCTION_SLOTS:
+        assert getattr(get_diagnostic(slot), "backend", "missing") is None
     dataset_components = {
         name for name in DIAGNOSTIC_REGISTRY if not name.startswith("score_")
     }
-    assert dataset_components == {"b_rep", "b_leak", *LIGHTWEIGHT_CONSTRUCTION_SLOTS}
+    assert dataset_components == {"b_rep", "b_leak", *CONSTRUCTION_SLOTS}
 
 
 def test_every_public_symbol_named_in_all_actually_imports():
@@ -729,9 +735,6 @@ def test_every_public_symbol_named_in_all_actually_imports():
     # D032: nothing unimplemented is advertised on the public surface.
     for unshipped in (
         "FramePredicateLike",
-        "EmbeddingBackend",
-        "GrammarCheckerBackend",
-        "DependencyParserBackend",
         "OutputAssociation",
         "_resolve_extractor",
     ):
