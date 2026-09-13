@@ -343,7 +343,7 @@ def test_registry_exports_default_component_and_schema_is_strict_json_1_4():
     assert COMPONENT in list_diagnostics()
     assert isinstance(diagnostic, ScorerCounterfactualSensitivity)
     assert diagnostic == ScorerCounterfactualSensitivity()
-    assert payload["schema_version"] == "1.4"
+    assert payload["schema_version"] == "1.7"
     assert math.isfinite(payload["components"][COMPONENT]["value"])
     assert report.to_json(indent=None) == report.to_json(indent=None)
     json.dumps(payload, allow_nan=False, sort_keys=True)

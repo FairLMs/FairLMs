@@ -69,14 +69,16 @@ def as_examples(data: Any, metric: str, what: str) -> list:
 def require_mapping_keys(examples: Sequence[Any], metric: str, *keys: str) -> None:
     """Validate that dict-shaped examples carry the keys the metric reads.
 
-    Checks the first element only, which is enough to turn a ``KeyError`` raised deep in
-    a scoring loop into an actionable message up front.
+    Validate every row before scoring, including non-mapping rows.
     """
-    if not examples or not isinstance(examples[0], Mapping):
-        return
-    missing = [k for k in keys if k not in examples[0]]
-    if missing:
-        raise ValueError(
-            f"{metric}: examples are missing key(s) {', '.join(missing)}. "
-            f"Each example needs {', '.join(keys)}; got {sorted(examples[0])}."
-        )
+    for index, row in enumerate(examples):
+        if not isinstance(row, Mapping):
+            raise TypeError(
+                f"{metric}: example {index} must be a mapping, got {type(row).__name__}."
+            )
+        missing = [key for key in keys if key not in row]
+        if missing:
+            raise ValueError(
+                f"{metric}: example {index} is missing key(s) {', '.join(missing)}. "
+                f"Each example needs {', '.join(keys)}."
+            )

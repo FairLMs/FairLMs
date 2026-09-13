@@ -42,7 +42,7 @@ class DiscoveryOfCorrelationsScore(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = (GroupWordPairs,)
 
     def __init__(
@@ -58,8 +58,7 @@ class DiscoveryOfCorrelationsScore(FairnessMetric):
         self.seed = seed
         self.templates = templates
 
-    @staticmethod
-    def _as_pipeline(model, tokenizer):
+    def _as_pipeline(self, model, tokenizer):
         """Return a fill-mask pipeline, building one from an MLM if needed."""
         if model is None:
             raise ValueError(
@@ -164,7 +163,7 @@ class LogProbabilityBiasScore(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = RECORD_CORPUS
 
     def __init__(
@@ -273,7 +272,7 @@ class ContrastBasedScore(FairnessMetric):
     bias_type = "intrinsic"
     architectures = ("encoder_only",)
     required_task = "mlm"
-    requires = frozenset({"masked_token_scores"})
+    requires = frozenset({"masked_token_scores", "local_tokenizer"})
     accepts = (ContrastSpec,)
 
     def __init__(

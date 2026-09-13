@@ -23,7 +23,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from fairlms.diagnostics.spec import DatasetAuditSpec
 
 
-DIAGNOSTIC_SCHEMA_VERSION = "1.4"
+DIAGNOSTIC_SCHEMA_VERSION = "1.7"
 
 
 class DiagnosticStatus(str, Enum):

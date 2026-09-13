@@ -70,6 +70,183 @@ report warns that divergence is descriptive evidence rather than an automatic
 fairness failure. The spec records the stance and each reference's purpose, and
 the report serializes both.
 
+## Stereotype leakage
+
+`b_leak` is smoothed normalized mutual information between declared group terms
+and declared trait terms, over the complete `|G| x |T|` pair space. The paper
+preset -- add-one smoothing, base-2 logs, the complete pair space -- is the
+default, and both are recorded in the result.
+
+Turning text into counts is a *separate* stage with its own immutable
+configuration, so a count matrix and the corpus it came from can never disagree
+about the lexicon, the window or the tokenization:
+
+```python
+from fairlms.diagnostics import (
+    DatasetAuditSpec,
+    LeakageExtractionConfig,
+    SurfaceCooccurrenceExtractor,
+    TextEvidence,
+    audit_leakage,
+)
+
+extraction = LeakageExtractionConfig(
+    group_lexicon=("she", "her", "he", "him"),
+    trait_lexicon=("nurse", "engineer"),
+    window=5,
+)
+texts = TextEvidence(
+    axis="gender",
+    texts=("she is a nurse", "he is an engineer", "she is an engineer"),
+    source="My benchmark, evaluation split",
+)
+spec = DatasetAuditSpec(
+    target_name="my-benchmark",
+    target_kind="benchmark_dataset",
+    task_family="free_text",
+    design_stance="stress_test",
+    protected_axes=("gender",),
+    requested_components=("b_leak",),
+    leakage_extraction=extraction,
+)
+
+report = audit_leakage(texts, spec)
+print(report.components["b_leak"].value)
+
+# The same fixture through the supplied-count-matrix path gives the same value.
+counts = SurfaceCooccurrenceExtractor(config=extraction).extract(texts)
+assert audit_leakage(counts, spec).components["b_leak"].value == (
+    report.components["b_leak"].value
+)
+```
+
+An extraction that runs and matches nothing may report exactly `0.0`, but only
+with `details["zero_lexical_hits"]` and a warning saying the zero reflects an
+absence of lexicon matches rather than an absence of association. An all-zero
+matrix with no extraction record is `blocked`
+(`zero_counts_without_extraction_record`), because malformed evidence must not
+be indistinguishable from a measured zero.
+
+## The construction vector
+
+`b_constr` is not one number. It is a vector of eight independent components in
+a fixed order, and the package deliberately publishes no aggregate construction
+score:
+
+| Slot | Question |
+|---|---|
+| `b_min` | how far the two sides of a pair differ once declared identity terms are masked |
+| `b_equiv` | embedding-space equivalence of the two sides |
+| `b_gram` | grammaticality difference between the two sides |
+| `b_diff_len` | largest pairwise group mean-length gap, over the sample-weighted pooled mean |
+| `b_diff_dep` | dependency-structure difference across groups |
+| `b_frame` | largest pairwise gap in the rate of a declared framing |
+| `b_opt` | signed option-length difference between two declared option roles |
+| `b_temp` | template-count imbalance across declared groups, with its coverage ratio |
+
+`b_equiv`, `b_gram` and `b_diff_dep` need an optional backend that this release
+does not ship. Nothing is registered for them, so `list_diagnostics()` never
+advertises a component that cannot run; `audit_construction` and `audit_dataset`
+synthesize the slot instead. The backend is checked last, so such a slot is
+`blocked` with a reason code naming the missing backend only when it was
+requested *and* the evidence view it needs is present for the audited axis --
+`paired_texts` for `b_equiv` and `b_gram`, `grouped_texts` for `b_diff_dep`.
+Otherwise it is `not_applicable` for the ordinary reason: `component_not_requested`,
+`target_kind_not_supported`, or `evidence_view_not_supplied`. The snippet below
+supplies only `grouped_texts`, so it prints `b_equiv` and `b_gram` as
+`not_applicable` and `b_diff_dep` as `blocked`. To find the slots that need a
+backend, read `BACKEND_CONSTRUCTION_SLOTS` and
+`CONSTRUCTION_BACKEND_REQUIREMENTS` rather than filtering on status. A missing
+backend blocks only its own slot; every other slot is unaffected.
+
+Two rules are worth stating outright. Option roles are always supplied by name:
+`stereotype` and `anti_stereotype` are never inferred from the order the options
+appear in. And a declared group with no rows, or any normalized component with a
+zero denominator, is `blocked` rather than reported as `0.0`.
+
+```python
+from fairlms.diagnostics import (
+    CONSTRUCTION_SLOTS,
+    DatasetEvidence,
+    GroupedTexts,
+    LengthDisparity,
+    audit_construction,
+    construction_vector,
+)
+
+grouped = GroupedTexts(
+    axis="gender",
+    groups=("female", "male", "female"),
+    texts=("she is a nurse", "he is an engineer", "she is an engineer"),
+    declared_groups=("female", "male"),
+    source="My benchmark, evaluation split",
+)
+evidence = DatasetEvidence(
+    target_name="my-benchmark",
+    texts={"gender": texts},
+    grouped_texts={"gender": grouped},
+)
+construction_spec = DatasetAuditSpec(
+    target_name="my-benchmark",
+    target_kind="benchmark_dataset",
+    task_family="free_text",
+    design_stance="stress_test",
+    protected_axes=("gender",),
+    requested_components=CONSTRUCTION_SLOTS,
+)
+
+construction_report = audit_construction(
+    evidence, construction_spec, axis="gender", diagnostics=(LengthDisparity(),)
+)
+for result in construction_vector(construction_report):
+    print(result.component, result.status.value, result.value)
+```
+
+`DiagnosticReport` alphabetizes its components, so `CONSTRUCTION_SLOTS`,
+`construction_vector(report)` and `provenance["slot_order"]` are the only
+authorities for the declared order.
+
+## One audit over several evidence views
+
+`audit_dataset` runs several components over one axis of one dataset and returns
+a single report. It plans and runs exactly what `spec.requested_components`
+asks for: registry membership never causes anything to run, and no component is
+ever chosen from a dataset's name.
+
+```python
+from fairlms.diagnostics import audit_dataset
+
+audit_spec = DatasetAuditSpec(
+    target_name="my-benchmark",
+    target_kind="benchmark_dataset",
+    task_family="free_text",
+    design_stance="stress_test",
+    protected_axes=("gender",),
+    requested_components=("b_leak", *CONSTRUCTION_SLOTS),
+    leakage_extraction=extraction,
+)
+
+audit = audit_dataset(
+    evidence, audit_spec, axis="gender", diagnostics=(LengthDisparity(),)
+)
+plan = audit.plan()          # applicability only; no arithmetic has run
+report = audit.run()
+```
+
+Each evidence view is built by its own container's adapter and passed in by
+axis; `DatasetEvidence` re-models nothing and never converts one view into
+another. A requested component whose view is absent is reported, not skipped:
+`b_min` without `paired_texts` is `not_applicable`
+(`evidence_view_not_supplied`), and `b_leak` with neither a count matrix nor
+text is `blocked` (`missing_association_evidence`). Requesting any construction
+slot puts all eight in the report, so the vector is never silently short.
+
+The audit is single-axis on purpose. A three-axis benchmark is three calls and
+three reports, because a rollup across axes is a decision the caller should make
+explicitly. Row-level scorer results keep their own entry point: a `score_*`
+name inside `audit_dataset` is reported `not_applicable`
+(`component_requires_score_evidence`) and pointed at `audit_scores`.
+
 ## Auditing scores
 
 Four components describe one scoring instrument, at row level. None of them runs

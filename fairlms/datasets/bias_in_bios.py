@@ -53,17 +53,22 @@ class BiasInBios(FairnessDataset):
         split: str = "test",
         n_max: Optional[int] = None,
         hf_path: str = "LabHC/bias_in_bios",
+        revision: Optional[str] = None,
     ):
         self.split = split
         self.n_max = n_max
         self.hf_path = hf_path
+        self.revision = revision
         self._cache: Optional[List[dict]] = None
         self._raw = None
 
     def _load_hf(self):
         from datasets import load_dataset
 
-        return load_dataset(self.hf_path, split=self.split)
+        loaded = load_dataset(self.hf_path, split=self.split, revision=self.revision)
+        self._resolved_hf_path = self.hf_path
+        self._resolved_fingerprint = getattr(loaded, "_fingerprint", None)
+        return loaded
 
     def load(self) -> Sequence[dict]:
         if self._cache is not None:

@@ -189,6 +189,21 @@ The first diagnostic is axis-level representativeness (`b_rep`): smoothed
 `KL(observed || reference)` in nats. It requires an explicit reference and its
 provenance; the package does not infer a population prior from a dataset name.
 
+Alongside it, `b_leak` measures group-trait association as smoothed normalized
+mutual information over a declared lexicon pair space, and `b_constr` is
+published as a vector of eight independent construction slots (`b_min`,
+`b_equiv`, `b_gram`, `b_diff_len`, `b_diff_dep`, `b_frame`, `b_opt`, `b_temp`)
+with no aggregate score. The three backend-dependent slots are never registered
+as stubs: each is synthesized as a non-ready result, `blocked` with a backend
+reason code when the slot was requested and its required evidence view is
+present, and otherwise `not_applicable` for the ordinary reason (not requested,
+unsupported target kind, or view not supplied) -- `BACKEND_CONSTRUCTION_SLOTS`
+and `CONSTRUCTION_BACKEND_REQUIREMENTS`, not the status, name the slots that
+need a backend. `audit_dataset(evidence, spec, axis=...)` runs the requested
+components over one axis of a `DatasetEvidence` and returns one report, while
+`audit_scores` remains the separate entry point for row-level scores. See the
+[dataset audit guide](docs/guides/dataset-audit.md).
+
 ```python
 from fairlms.diagnostics import (
     DatasetAuditSpec,

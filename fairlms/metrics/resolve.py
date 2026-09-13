@@ -10,7 +10,6 @@ from fairlms.applicability import check_applicability
 from fairlms.models.base import LoadedModel, ModelAdapter
 from fairlms.models.openai import OpenAILoadedModel, OpenAIModel
 
-
 #: The heads :class:`~fairlms.models.HuggingFaceModel` can attach to a local
 #: checkpoint. A ``task`` outside this set (``openai``) is a different kind of
 #: deployment, not a different head.
@@ -122,7 +121,11 @@ def get_tokenizer_model(
     if isinstance(model, (tuple, list)) and len(model) >= 2:
         tok, mod = model[0], model[1]
         if len(model) >= 3 and model[2] is not None:
-            device = torch.device(model[2]) if not isinstance(model[2], torch.device) else model[2]
+            device = (
+                torch.device(model[2])
+                if not isinstance(model[2], torch.device)
+                else model[2]
+            )
         else:
             device = next(mod.parameters()).device
         return tok, mod, device
@@ -137,20 +140,28 @@ def get_tokenizer_model(
     )
 
 
-def get_openai_bundle(model: Any) -> OpenAILoadedModel:
+def get_openai_bundle(model: Any, *, metric: Any = None) -> OpenAILoadedModel:
     """Return an OpenAI client bundle from an adapter or loaded object."""
     if model is None:
-        return OpenAIModel().load()
+        model = OpenAIModel()
+    check_model_applicability(model, metric)
     if isinstance(model, OpenAIModel):
-        return model.load()
-    if isinstance(model, OpenAILoadedModel):
-        return model
-    if hasattr(model, "completions") or hasattr(model, "chat"):
-        # Raw OpenAI client
-        return OpenAILoadedModel(name="openai", client=model, model="davinci-002")
-    raise TypeError(
-        "Pass an OpenAIModel / OpenAILoadedModel, or a raw OpenAI client"
-    )
+        bundle = model.load()
+    elif isinstance(model, OpenAILoadedModel):
+        bundle = model
+    elif hasattr(model, "completions"):
+        bundle = OpenAILoadedModel(name="openai", client=model, model="davinci-002")
+    else:
+        bundle = None
+    if bundle is not None:
+        if not callable(
+            getattr(getattr(bundle.client, "completions", None), "create", None)
+        ):
+            raise TypeError(
+                "This metric requires a Completions API client with completions.create()."
+            )
+        return bundle
+    raise TypeError("Pass an OpenAIModel / OpenAILoadedModel, or a raw OpenAI client")
 
 
 def require_kwargs(kwargs: dict, *keys: str) -> None:

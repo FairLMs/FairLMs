@@ -55,8 +55,8 @@ anything you intend to report.
 `crows_pairs_score` and the AUL family both report *the percentage of pairs
 where the stereotypical sentence scores higher*, so 50 is parity and above 50
 favours the stereotype. They disagree here (55.0 vs 30.0) because they score
-sentences differently: CPS masks and scores only the tokens that differ between
-the pair, AUL scores every token unmasked in one pass. That disagreement is the
+sentences differently: CPS masks and scores the shared tokens, leaving the differing group
+tokens visible in each sentence, AUL scores every token unmasked in one pass. That disagreement is the
 point of implementing both; neither is a corrected version of the other.
 
 `weat` reports Cohen's *d*, where 0 is no differential association and the
@@ -75,11 +75,12 @@ for ckpt in ("bert-base-uncased", "roberta-base", "distilbert-base-uncased"):
     print(ckpt, CrowSPairsScore().compute(model, pairs).score)
 ```
 
-!!! warning "AULA needs a named trunk"
-    `all_unmasked_likelihood_attention_score` weights each token by mean
-    attention, which requires the loaded object to expose `.bert` or `.roberta`.
-    On a checkpoint whose architecture exposes neither, it raises
-    `AttributeError` rather than silently falling back to unweighted AUL.
+!!! note "AULA requires attention tensors"
+    The model must return attention tensors when called with
+    `output_attentions=True`. Where supported, scoring temporarily selects eager
+    attention and restores the original backend afterward. Missing attention
+    tensors raise an explicit error. BERT and DistilBERT are covered by offline
+    integration tests using real transformers classes and random weights.
 
 ## Other data sources
 
@@ -88,3 +89,11 @@ for ckpt in ("bert-base-uncased", "roberta-base", "distilbert-base-uncased"):
 `context_association_test` wants, and any list of dicts with `stereotype` /
 `anti_stereotype` keys works directly. See
 [Bring your own data](own-data.md).
+
+StereoSet intersentence rows preserve a `scoring_context`. It stays visible and
+only candidate tokens are scored. CAT reports candidate masked-PLL scores and
+micro aggregation across triples; it is not the full official StereoSet
+per-target macro benchmark. LMS uses both meaningful-vs-unrelated comparisons.
+
+XNLI religion substitutions are returned as counterfactual pairs with source
+metadata; they do not establish human stereotype/anti-stereotype labels.

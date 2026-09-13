@@ -23,9 +23,18 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional, Sequence
 
-from fairlms.metrics import METRIC_REGISTRY
+from fairlms.metrics import METRIC_REGISTRY, FairnessMetric
+from fairlms.provenance import json_safe, model_provenance
+from fairlms.diagnostics._utils import freeze_json_mapping, thaw_json
+import copy
+import math
 
-__all__ = ["ComparisonReport", "MetricDelta", "compare_before_after"]
+__all__ = [
+    "ComparisonReport",
+    "MetricDelta",
+    "MetricEvaluation",
+    "compare_before_after",
+]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -37,23 +46,35 @@ class MetricDelta:
     before: Optional[float]
     after: Optional[float]
     error: Optional[str] = None
+    provenance: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        object.__setattr__(
+            self,
+            "provenance",
+            freeze_json_mapping(json_safe(self.provenance), path="provenance"),
+        )
 
     @property
     def delta(self) -> Optional[float]:
         """``after - before``, or ``None`` when either side failed."""
         if self.before is None or self.after is None:
             return None
-        return self.after - self.before
+        value = self.after - self.before
+        return value if math.isfinite(value) else None
 
     def to_dict(self) -> dict:
-        return {
-            "metric": self.metric,
-            "bias_type": self.bias_type,
-            "before": self.before,
-            "after": self.after,
-            "delta": self.delta,
-            "error": self.error,
-        }
+        return json_safe(
+            {
+                "metric": self.metric,
+                "bias_type": self.bias_type,
+                "before": self.before,
+                "after": self.after,
+                "delta": self.delta,
+                "error": self.error,
+                "provenance": thaw_json(self.provenance),
+            }
+        )
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -66,6 +87,13 @@ class ComparisonReport:
     fairness: Sequence[MetricDelta] = ()
     utility: Sequence[MetricDelta] = ()
     provenance: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        object.__setattr__(
+            self,
+            "provenance",
+            freeze_json_mapping(json_safe(self.provenance), path="provenance"),
+        )
 
     @property
     def intrinsic(self) -> tuple:
@@ -84,7 +112,7 @@ class ComparisonReport:
                 "extrinsic": [d.to_dict() for d in self.extrinsic],
             },
             "utility": [d.to_dict() for d in self.utility],
-            "provenance": dict(self.provenance),
+            "provenance": thaw_json(self.provenance),
             "note": (
                 "Fairness and utility are reported separately, as are intrinsic "
                 "and extrinsic fairness. There is no composite effectiveness "
@@ -98,88 +126,148 @@ class ComparisonReport:
         )
 
 
-def compare_before_after(
-    base_model: Any,
-    mitigated_model: Any,
-    *,
-    metrics: Mapping[str, Any],
-    utility: Optional[Mapping[str, Any]] = None,
-    provenance: Optional[Mapping[str, Any]] = None,
-) -> ComparisonReport:
-    """Run a declared metric set against a base and a mitigated system.
+@dataclass(frozen=True, kw_only=True)
+class MetricEvaluation:
+    """A configured metric and explicit evidence handoff for a comparison.
 
-    Parameters
-    ----------
-    base_model, mitigated_model:
-        Anything the metrics accept. ``mitigated_model`` is typically
-        ``result.result`` from an intra-processing mitigator, which is a
-        :class:`~fairlms.models.base.ModelAdapter` and so needs no adaptation.
-    metrics:
-        Mapping of registry metric name -> the evidence to score it on. Named
-        explicitly rather than "all applicable metrics": which metrics
-        constitute the fairness claim is the caller's declaration.
-    utility:
-        Mapping of ``name -> callable(model) -> float`` for task performance.
-        Reported separately and never combined with the fairness deltas.
-    provenance:
-        Extra provenance recorded verbatim in the report.
-
-    Returns
-    -------
-    ComparisonReport
-        Partitioned deltas. A metric that raises is recorded with its error
-        rather than dropped, so a partial comparison is visibly partial.
+    Model-backed metrics reuse ``data``. For precomputed metrics, supply
+    ``after_data`` or ``evidence_factory(model)`` to generate predictions for
+    each system. The factory runs in the baseline/candidate phase respectively.
     """
-    unknown = sorted(set(metrics) - set(METRIC_REGISTRY))
+
+    metric: FairnessMetric
+    data: Any = None
+    after_data: Any = None
+    evidence_factory: Any = None
+
+
+def compare_before_after(
+    base_model, mitigated_model, *, metrics, utility=None, provenance=None
+):
+    """Compare configured metrics; retain missing/failed/undefined results.
+
+    ``metrics`` maps names to evidence (default configuration) or to a
+    ``MetricEvaluation``. Model-free metrics require explicit before/after
+    evidence. Fairness, utility, and intrinsic/extrinsic changes remain separate.
+    A removable adapter is deactivated before measuring the baseline and is
+    removed in a finally block after the candidate phase.
+    """
+    unknown = [
+        name
+        for name, value in metrics.items()
+        if name not in METRIC_REGISTRY and not isinstance(value, MetricEvaluation)
+    ]
     if unknown:
-        raise KeyError(
-            f"unknown metric(s): {', '.join(unknown)}. Available: "
-            f"{', '.join(sorted(METRIC_REGISTRY))}"
+        raise KeyError(f"unknown metric(s): {', '.join(sorted(unknown))}")
+    entries = {}
+    for name, value in metrics.items():
+        entry = (
+            value
+            if isinstance(value, MetricEvaluation)
+            else MetricEvaluation(metric=METRIC_REGISTRY[name](), data=value)
         )
-
-    fairness = []
-    for name in sorted(metrics):
-        cls = METRIC_REGISTRY[name]
-        metric, evidence = cls(), metrics[name]
-        before = after = None
-        error = None
-        try:
-            before = float(metric.compute(base_model, evidence))
-            after = float(metric.compute(mitigated_model, evidence))
-        except Exception as exc:  # recorded, not swallowed
-            error = f"{type(exc).__name__}: {exc}"
-        fairness.append(
-            MetricDelta(
-                metric=name,
-                bias_type=cls.bias_type,
-                before=before,
-                after=after,
-                error=error,
+        if not isinstance(entry.metric, FairnessMetric):
+            raise TypeError(
+                "MetricEvaluation.metric must be a FairnessMetric instance."
             )
-        )
+        entries[name] = entry
 
-    utility_deltas = []
-    for name in sorted(utility or {}):
-        function = utility[name]
-        before = after = None
-        error = None
+    remove = getattr(mitigated_model, "remove", None)
+    if callable(remove):
+        remove()  # Never measure a baseline through an already-installed hook.
+
+    def evaluate(entry, model, after):
         try:
-            before = float(function(base_model))
-            after = float(function(mitigated_model))
+            if entry.evidence_factory is not None:
+                data = entry.evidence_factory(model)
+            elif not entry.metric.requires and entry.after_data is None:
+                raise ValueError(
+                    "Precomputed metric comparison needs explicit after_data or evidence_factory; the model argument does not create new predictions."
+                )
+            else:
+                data = (
+                    entry.after_data
+                    if after and entry.after_data is not None
+                    else entry.data
+                )
+            metric = copy.deepcopy(entry.metric)
+            result = metric.compute(model, data)
+            score = float(result)
+            if not math.isfinite(score):
+                reason = (
+                    result.details.get("reason")
+                    or "metric returned an undefined or non-finite score"
+                )
+                return None, reason, json_safe(result.provenance)
+            return score, None, json_safe(result.provenance)
         except Exception as exc:
-            error = f"{type(exc).__name__}: {exc}"
-        utility_deltas.append(
-            MetricDelta(
-                metric=name,
-                bias_type="utility",
-                before=before,
-                after=after,
-                error=error,
-            )
-        )
+            return None, f"{type(exc).__name__}: {exc}", {}
 
+    def utility_value(function, model):
+        try:
+            score = float(function(model))
+            if not math.isfinite(score):
+                raise ValueError("utility returned a non-finite score")
+            return score, None
+        except Exception as exc:
+            return None, f"{type(exc).__name__}: {exc}"
+
+    def errors(before, after):
+        messages = []
+        if before:
+            messages.append(f"before: {before}")
+        if after:
+            messages.append(f"after: {after}")
+        return "; ".join(messages) or None
+
+    try:
+        baselines = {
+            name: evaluate(entries[name], base_model, False) for name in sorted(entries)
+        }
+        utility_baselines = {
+            name: utility_value(function, base_model)
+            for name, function in sorted((utility or {}).items())
+        }
+        fairness = []
+        for name in sorted(entries):
+            before, before_error, before_meta = baselines[name]
+            after, after_error, after_meta = evaluate(
+                entries[name], mitigated_model, True
+            )
+            fairness.append(
+                MetricDelta(
+                    metric=name,
+                    bias_type=entries[name].metric.bias_type,
+                    before=before,
+                    after=after,
+                    error=errors(before_error, after_error),
+                    provenance=freeze_json_mapping(
+                        {"before": before_meta, "after": after_meta}, path="provenance"
+                    ),
+                )
+            )
+        utility_deltas = []
+        for name, function in sorted((utility or {}).items()):
+            before, before_error = utility_baselines[name]
+            after, after_error = utility_value(function, mitigated_model)
+            utility_deltas.append(
+                MetricDelta(
+                    metric=name,
+                    bias_type="utility",
+                    before=before,
+                    after=after,
+                    error=errors(before_error, after_error),
+                )
+            )
+    finally:
+        if callable(remove):
+            remove()  # Cleanup failure must be visible to the caller.
     return ComparisonReport(
         fairness=tuple(fairness),
         utility=tuple(utility_deltas),
-        provenance=dict(provenance or {}),
+        provenance={
+            "base_model": model_provenance(base_model),
+            "candidate_model": model_provenance(mitigated_model),
+            "user": json_safe(provenance or {}),
+        },
     )

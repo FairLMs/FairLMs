@@ -76,7 +76,7 @@ class LexicalFrequencyProportion(_TranslationCorpusMetric):
 
     name = "lexical_frequency_proportion"
     required_task = "seq2seq"
-    requires = frozenset({"free_generation"})
+    requires = frozenset({"free_generation", "local_tokenizer"})
     accepts = RECORD_CORPUS
 
     def compute(
@@ -115,7 +115,7 @@ class MorphologicalChoiceDivergence(_TranslationCorpusMetric):
 
     name = "morphological_choice_divergence"
     required_task = "seq2seq"
-    requires = frozenset({"free_generation"})
+    requires = frozenset({"free_generation", "local_tokenizer"})
     accepts = RECORD_CORPUS
 
     def compute(

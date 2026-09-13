@@ -406,6 +406,9 @@ class AttributeLabeledVectors:
     vectors: Any
     labels: Sequence[str]
     source: str
+    representation_layer: Optional[str] = None
+    pooling: Optional[str] = None
+    pair_ids: Optional[Sequence[str]] = None
 
     def __post_init__(self) -> None:
         import numpy as np
@@ -414,7 +417,7 @@ class AttributeLabeledVectors:
         object.__setattr__(
             self, "source", require_nonempty_string(self.source, "source")
         )
-        vectors = np.asarray(self.vectors, dtype=float)
+        vectors = np.array(self.vectors, dtype=float, copy=True)
         if vectors.ndim != 2:
             raise ValueError(
                 f"vectors must be a 2-D (n_rows, n_features) array; got shape "
@@ -433,6 +436,16 @@ class AttributeLabeledVectors:
                 "labels must contain at least two observed attribute values; a "
                 "probe cannot be fitted against a constant."
             )
+        if vectors.shape[1] == 0:
+            raise ValueError("vectors must have at least one feature.")
+        for field in ("representation_layer", "pooling"):
+            if getattr(self, field) is not None:
+                require_nonempty_string(getattr(self, field), field)
+        if self.pair_ids is not None:
+            ids = _check_texts(self.pair_ids, "pair_ids")
+            if len(ids) != len(labels):
+                raise ValueError("pair_ids must align with vectors.")
+            object.__setattr__(self, "pair_ids", ids)
         vectors.setflags(write=False)
         object.__setattr__(self, "vectors", vectors)
         object.__setattr__(self, "labels", labels)

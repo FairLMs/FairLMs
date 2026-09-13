@@ -71,10 +71,13 @@ class HuggingFaceModel(ModelAdapter):
             AutoTokenizer,
         )
 
+        tokenizer_kwargs = dict(self.tokenizer_kwargs)
+        if "revision" in self.model_kwargs:
+            tokenizer_kwargs.setdefault("revision", self.model_kwargs["revision"])
         tokenizer = _from_pretrained(
             AutoTokenizer.from_pretrained,
             self.model_name,
-            **self.tokenizer_kwargs,
+            **tokenizer_kwargs,
         )
 
         if self.task == "mlm":
@@ -102,7 +105,21 @@ class HuggingFaceModel(ModelAdapter):
             self.model_name,
             **model_kwargs,
         )
-        model.to(self.device)
+        dispatched = bool(getattr(model, "hf_device_map", None))
+        quantized = bool(
+            getattr(model, "is_loaded_in_8bit", False)
+            or getattr(model, "is_loaded_in_4bit", False)
+        )
+        if not dispatched and not quantized:
+            model.to(self.device)
+        # Input device follows the input embedding, not the first visible GPU.
+        embedding = model.get_input_embeddings()
+        if embedding is not None and hasattr(embedding, "weight"):
+            self.device = embedding.weight.device
+        if self.device.type == "meta":
+            raise ValueError(
+                "Input embeddings are offloaded to meta; supply a supported device_map."
+            )
         model.eval()
 
         if tokenizer.pad_token is None and tokenizer.eos_token is not None:

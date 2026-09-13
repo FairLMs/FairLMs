@@ -33,9 +33,10 @@ DIST_NAME = {
 
 def _declared_core_dependencies() -> set[str]:
     """Distribution names in [project.dependencies], normalized."""
-    tomllib = pytest.importorskip(
-        "tomllib", reason="needs Python 3.11+ to read pyproject.toml"
-    )
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
     with open(REPO_ROOT / "pyproject.toml", "rb") as fh:
         cfg = tomllib.load(fh)
     out = set()
@@ -165,11 +166,11 @@ def test_sdist_manifest_includes_diagnostic_reproducibility_material():
         for line in manifest.read_text(encoding="utf-8").splitlines()
         if line.strip() and not line.lstrip().startswith("#")
     ]
-    assert ["recursive-include", "tests/data/golden", "*.json"] in rules, (
+    assert ["recursive-include", "tests", "*.py", "*.json"] in rules, (
         "MANIFEST.in must recursively include tests/data/golden/**/*.json so "
         "paper-parity fixtures ship in the source distribution"
     )
-    assert ["recursive-include", "docs", "*.md"] in rules
+    assert ["recursive-include", "docs", "*.md", "*.ipynb"] in rules
     assert ["recursive-include", "examples", "*.md", "*.py"] in rules
     assert (REPO_ROOT / "docs" / "preparing_audit_evidence.md").is_file()
     assert (REPO_ROOT / "examples" / "scorer_rate_gap_diagnostic.py").is_file()
@@ -183,3 +184,19 @@ def test_sdist_manifest_includes_diagnostic_reproducibility_material():
         / "score_counterfactual_sensitivity"
         / "bbq_age_toxicity_v1.json"
     ).is_file()
+
+
+def test_registry_documentation_generates_from_current_source():
+    """Catch obsolete registry fields and documentation drift in the sdist too."""
+    import subprocess
+
+    completed = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "scripts/gen_registry_docs.py"), "--check"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    diagnostics = (REPO_ROOT / "docs/registry/diagnostics.md").read_text()
+    assert "fairlms[construction-backends]" not in diagnostics
+    assert "not_implemented_in_this_release" in diagnostics

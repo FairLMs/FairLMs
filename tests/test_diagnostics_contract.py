@@ -67,6 +67,48 @@ PUBLIC_NAMES = {
     "DIAGNOSTIC_REGISTRY",
     "list_diagnostics",
     "get_diagnostic",
+    # Milestone 3/4 evidence containers and audit intent.
+    "AssociationCounts",
+    "TextEvidence",
+    "GroupedTexts",
+    "PairedTexts",
+    "OptionItems",
+    "TemplateGroups",
+    "DatasetEvidence",
+    "ComponentOverride",
+    # b_leak.
+    "TokenMatchAttribute",
+    "LogBase",
+    "LeakageExtractionConfig",
+    "LeakageExtractionRecord",
+    "LeakageExtractor",
+    "SurfaceCooccurrenceExtractor",
+    "EXTRACTOR_VERSION",
+    "StereotypeLeakage",
+    "audit_leakage",
+    # The eight-slot construction vector.
+    "TokenizationMode",
+    "TokenizationRule",
+    "IdentityMaskConfig",
+    "OptionRoleContrast",
+    "FrameMatchMode",
+    "FramePredicate",
+    "InjectedFramePredicate",
+    "SELF_IDENTIFICATION_FRAME",
+    "CONSTRUCTION_SLOTS",
+    "LIGHTWEIGHT_CONSTRUCTION_SLOTS",
+    "BACKEND_CONSTRUCTION_SLOTS",
+    "CONSTRUCTION_BACKEND_REQUIREMENTS",
+    "construction_vector",
+    "MinimalPairResidual",
+    "LengthDisparity",
+    "OptionLengthBias",
+    "FramingDisparity",
+    "TemplateImbalance",
+    "audit_construction",
+    # The multi-evidence aggregate entry point.
+    "DatasetAudit",
+    "audit_dataset",
 }
 
 
@@ -275,7 +317,14 @@ def test_spec_and_reference_serialization_shape_is_frozen_for_schema_one():
         "design_stance",
         "references",
         "requested_components",
+        # Additive at schema 1.5: audit intent that audit_dataset needs.
+        "protected_axes",
+        "leakage_extraction",
+        "component_overrides",
     }
+    assert spec.to_dict()["protected_axes"] == []
+    assert spec.to_dict()["leakage_extraction"] is None
+    assert spec.to_dict()["component_overrides"] == {}
     assert set(spec.to_dict()["references"]["community"]) == {
         "axis",
         "probabilities",
@@ -352,7 +401,7 @@ def test_report_serialization_is_deterministic_complete_and_strict_json():
 
     payload = json.loads(encoded, parse_constant=reject_nonstandard_number)
     assert list(payload) == sorted(payload)
-    assert payload["schema_version"] == DIAGNOSTIC_SCHEMA_VERSION == "1.4"
+    assert payload["schema_version"] == DIAGNOSTIC_SCHEMA_VERSION == "1.7"
     assert set(payload) == {
         "schema_version",
         "status",
@@ -416,12 +465,22 @@ def test_report_rejects_nonportable_top_level_provenance(bad):
 def test_diagnostic_registry_is_separate_from_model_metric_registry():
     assert DIAGNOSTIC_REGISTRY is not METRIC_REGISTRY
     assert list_diagnostics() == [
+        "b_diff_len",
+        "b_frame",
+        "b_leak",
+        "b_min",
+        "b_opt",
         "b_rep",
+        "b_temp",
         "score_counterfactual_sensitivity",
         "score_mean_gap",
         "score_rate_gap",
         "score_wasserstein_1_gap",
     ]
+    # D032: the three backend-dependent construction slots have no
+    # implementation in this release, so nothing is registered for them.
+    for slot in ("b_equiv", "b_gram", "b_diff_dep"):
+        assert slot not in DIAGNOSTIC_REGISTRY
     assert "b_rep" in DIAGNOSTIC_REGISTRY
     assert "score_counterfactual_sensitivity" in DIAGNOSTIC_REGISTRY
     assert "score_mean_gap" in DIAGNOSTIC_REGISTRY

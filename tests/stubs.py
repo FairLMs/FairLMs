@@ -476,8 +476,9 @@ class _StubAttentionEncoder(nn.Module):
         if output_attentions:
             single = attention_weights(seq_len)
             attentions = tuple(
-                single.expand(input_ids.shape[0], self.n_heads, seq_len, seq_len)
-                .contiguous()
+                single.expand(
+                    input_ids.shape[0], self.n_heads, seq_len, seq_len
+                ).contiguous()
                 for _ in range(self.n_layers)
             )
         return SimpleNamespace(last_hidden_state=hidden, attentions=attentions)
@@ -531,8 +532,17 @@ class StubMaskedLM(_FixedLogitModel):
         encoder = getattr(self, "bert", None)
         return bool(encoder is not None and any(encoder.attention_requests))
 
-    def forward(self, input_ids=None, attention_mask=None, **_: Any):
-        return SimpleNamespace(logits=self.fixed_logits(input_ids))
+    def forward(
+        self, input_ids=None, attention_mask=None, output_attentions=False, **_: Any
+    ):
+        attentions = None
+        if output_attentions and hasattr(self, "bert"):
+            attentions = self.bert(
+                input_ids=input_ids, output_attentions=True
+            ).attentions
+        return SimpleNamespace(
+            logits=self.fixed_logits(input_ids), attentions=attentions
+        )
 
 
 class StubFillMaskPipeline:
@@ -545,7 +555,9 @@ class StubFillMaskPipeline:
     task = "fill-mask"
 
     def __init__(
-        self, model: Optional[StubMaskedLM] = None, tokenizer: Optional[StubTokenizer] = None
+        self,
+        model: Optional[StubMaskedLM] = None,
+        tokenizer: Optional[StubTokenizer] = None,
     ) -> None:
         self.model = model if model is not None else StubMaskedLM()
         self.tokenizer = tokenizer if tokenizer is not None else StubTokenizer()
@@ -692,7 +704,9 @@ class _TinyBlock(nn.Module):
 
 
 class _TinyTransformer(nn.Module):
-    def __init__(self, vocab_size: int, n_positions: int, n_embd: int, n_head: int, n_layer: int):
+    def __init__(
+        self, vocab_size: int, n_positions: int, n_embd: int, n_head: int, n_layer: int
+    ):
         super().__init__()
         self.wte = nn.Embedding(vocab_size, n_embd)
         self.wpe = nn.Embedding(n_positions, n_embd)
@@ -731,7 +745,9 @@ class TinyCausalLM(nn.Module):
     ) -> None:
         super().__init__()
         n_embd = n_head * head_dim
-        self.transformer = _TinyTransformer(vocab_size, n_positions, n_embd, n_head, n_layer)
+        self.transformer = _TinyTransformer(
+            vocab_size, n_positions, n_embd, n_head, n_layer
+        )
         self.lm_head = nn.Linear(n_embd, vocab_size, bias=False)
         self.config = SimpleNamespace(
             vocab_size=vocab_size,
@@ -749,7 +765,8 @@ class TinyCausalLM(nn.Module):
         with torch.no_grad():
             for param in self.parameters():
                 param.copy_(
-                    torch.randn(param.shape, generator=generator, dtype=param.dtype) * 0.3
+                    torch.randn(param.shape, generator=generator, dtype=param.dtype)
+                    * 0.3
                 )
 
     @property
@@ -811,7 +828,9 @@ class _StubEncoder(nn.Module):
     able to separate.
     """
 
-    def __init__(self, d_model: int, n_layers: int, vocab_size: int = VOCAB_SIZE) -> None:
+    def __init__(
+        self, d_model: int, n_layers: int, vocab_size: int = VOCAB_SIZE
+    ) -> None:
         super().__init__()
         self.d_model = d_model
         self.block = nn.ModuleList(_StubBlock(d_model) for _ in range(n_layers))
@@ -917,9 +936,7 @@ class StubSeq2SeqLM(nn.Module):
     def generate(self, input_ids=None, attention_mask=None, **_: Any) -> torch.Tensor:
         prompt = self.tokenizer.decode(input_ids[0], skip_special_tokens=True)
         self.prompts_seen.append(prompt)
-        text = next(
-            (v for k, v in self.by_prompt.items() if k in prompt), None
-        )
+        text = next((v for k, v in self.by_prompt.items() if k in prompt), None)
         if text is None:
             text = next(self._cycle)
         ids = self.tokenizer.encode(text, return_tensors="pt")

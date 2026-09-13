@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from numbers import Real
 from types import MappingProxyType
-from typing import Any, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 from fairlms.diagnostics._utils import (
     freeze_json_mapping,
@@ -16,6 +16,10 @@ from fairlms.diagnostics._utils import (
     require_nonempty_string,
     thaw_json,
 )
+
+if TYPE_CHECKING:  # pragma: no cover - imported only by type checkers
+    from fairlms.diagnostics.base import DiagnosticStatus
+    from fairlms.diagnostics.leakage import LeakageExtractionConfig
 
 _PROBABILITY_SUM_TOLERANCE = 1e-9
 
@@ -185,6 +189,70 @@ class ReferenceDistribution:
 
 
 @dataclass(frozen=True, kw_only=True)
+class ComponentOverride:
+    """Caller-declared applicability decision that can only suppress a component.
+
+    An override is auditable but never generative: it may assert
+    ``not_applicable`` or ``blocked`` and nothing else, so it can never
+    manufacture a value for a component that did not run.
+    """
+
+    component: str
+    status: "DiagnosticStatus"
+    reason: str
+    declared_reason_code: str
+    provenance: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Imported inside the method so the declared one-way import direction
+        # (evidence -> spec -> base) is preserved at module scope, exactly as
+        # ``DiagnosticReport.__post_init__`` imports ``DatasetAuditSpec``.
+        from fairlms.diagnostics.base import DiagnosticStatus
+
+        object.__setattr__(
+            self,
+            "component",
+            require_nonempty_string(self.component, "component"),
+        )
+        object.__setattr__(
+            self, "reason", require_nonempty_string(self.reason, "reason")
+        )
+        object.__setattr__(
+            self,
+            "declared_reason_code",
+            require_nonempty_string(
+                self.declared_reason_code, "declared_reason_code"
+            ),
+        )
+        status = normalize_enum(self.status, DiagnosticStatus, "status")
+        if status not in (
+            DiagnosticStatus.NOT_APPLICABLE,
+            DiagnosticStatus.BLOCKED,
+        ):
+            raise ValueError(
+                "a component override may only declare 'not_applicable' or "
+                "'blocked'; a ready or failed status cannot be asserted by an "
+                "override."
+            )
+        object.__setattr__(self, "status", status)
+        object.__setattr__(
+            self,
+            "provenance",
+            freeze_json_mapping(self.provenance, path="provenance"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a new JSON-safe representation."""
+        return {
+            "component": self.component,
+            "status": self.status.value,
+            "reason": self.reason,
+            "declared_reason_code": self.declared_reason_code,
+            "provenance": thaw_json(self.provenance),
+        }
+
+
+@dataclass(frozen=True, kw_only=True)
 class DatasetAuditSpec:
     """Explicit scientific intent for a dataset or result-table audit."""
 
@@ -194,6 +262,9 @@ class DatasetAuditSpec:
     design_stance: DesignStance
     references: Mapping[str, ReferenceDistribution] = field(default_factory=dict)
     requested_components: Sequence[str] = ("b_rep",)
+    protected_axes: Sequence[str] = ()
+    leakage_extraction: Optional["LeakageExtractionConfig"] = None
+    component_overrides: Mapping[str, ComponentOverride] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -248,6 +319,62 @@ class DatasetAuditSpec:
             raise ValueError("requested_components must not contain duplicates.")
         object.__setattr__(self, "requested_components", components)
 
+        protected_axes = normalize_string_sequence(
+            self.protected_axes,
+            field_name="protected_axes",
+        )
+        if len(set(protected_axes)) != len(protected_axes):
+            raise ValueError("protected_axes must not contain duplicates.")
+        object.__setattr__(self, "protected_axes", protected_axes)
+        if protected_axes:
+            for axis in self.references:
+                if axis not in protected_axes:
+                    raise ValueError(
+                        f"references axis {axis!r} is not declared in "
+                        f"protected_axes {list(protected_axes)!r}."
+                    )
+
+        if self.leakage_extraction is not None:
+            # Imported inside the method to avoid a spec <-> leakage cycle.
+            from fairlms.diagnostics.leakage import LeakageExtractionConfig
+
+            if not isinstance(self.leakage_extraction, LeakageExtractionConfig):
+                raise TypeError(
+                    "leakage_extraction must be a LeakageExtractionConfig or "
+                    f"None, got {type(self.leakage_extraction).__name__}."
+                )
+
+        if not isinstance(self.component_overrides, Mapping):
+            raise TypeError(
+                "component_overrides must be a mapping of component name -> "
+                "ComponentOverride."
+            )
+        overrides = {}
+        for name, override in self.component_overrides.items():
+            require_nonempty_string(name, "component_overrides key")
+            if not isinstance(override, ComponentOverride):
+                raise TypeError(
+                    f"component_overrides[{name!r}] must be a "
+                    f"ComponentOverride, got {type(override).__name__}."
+                )
+            if override.component != name:
+                raise ValueError(
+                    f"component_overrides key {name!r} does not match "
+                    f"override.component {override.component!r}."
+                )
+            if name not in components:
+                raise ValueError(
+                    f"component_overrides names {name!r}, which is not in "
+                    "requested_components; an override for a component that "
+                    "never runs is a silent no-op."
+                )
+            overrides[name] = override
+        object.__setattr__(
+            self,
+            "component_overrides",
+            MappingProxyType(dict(sorted(overrides.items()))),
+        )
+
     def to_dict(self) -> dict[str, Any]:
         """Return a new JSON-safe representation."""
         return {
@@ -259,10 +386,21 @@ class DatasetAuditSpec:
                 axis: reference.to_dict() for axis, reference in self.references.items()
             },
             "requested_components": list(self.requested_components),
+            "protected_axes": list(self.protected_axes),
+            "leakage_extraction": (
+                None
+                if self.leakage_extraction is None
+                else self.leakage_extraction.to_dict()
+            ),
+            "component_overrides": {
+                name: override.to_dict()
+                for name, override in self.component_overrides.items()
+            },
         }
 
 
 __all__ = [
+    "ComponentOverride",
     "DatasetAuditSpec",
     "DesignStance",
     "ReferenceDistribution",
