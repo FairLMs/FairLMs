@@ -9,11 +9,6 @@ Fairness definitions and bias metrics for large language models — a companion 
 
 The long-term goal is a **stable, sklearn-style API**: import a metric, call `compute(...)`, and get a result — without caring where the implementation lives.
 
-> **Status:** All 33 metrics share one contract — configuration in the
-> constructor, data as a validated container passed to `compute(model, data)`.
-> Leaf `main.py` files and `examples/` are short public-API demos.
-> Implementation math still lives under `fairlms/definition/`.
-
 ## Install
 
 ```bash
@@ -81,20 +76,6 @@ git tag -a "v$(python scripts/package_version.py)" -m "Release" && git push orig
 ```
 
 Users then upgrade with `pip install --upgrade fairlms`.
-
-### Breaking changes
-
-| Version | Change | Migration |
-|---------|--------|-----------|
-| 0.4.0 | WEAT/SEAT sample permutations from a call-local generator, so `np.random.seed(...)` no longer pins their p-values | Pass the seed as config: `WEAT(seed=0)`, `SEAT(seed=0)`. Seeded p-values differ from pre-0.4.0 values for the same nominal seed (PCG64 vs Mersenne Twister); effect sizes are unaffected |
-| 0.3.0 | Project renamed `fairllms` → `fairlms` | `pip install fairlms`, `import fairlms` |
-| 0.2.0 | Package renamed `fairLLMs` → `fairllms` (PEP 8) | `import fairllms` |
-| 0.2.0 | Metric config is keyword-only | `WEAT(pooling="cls")`, not `WEAT("cls")` |
-
-Metric *calling* conventions were **not** broken in 0.2.0: the previous keyword
-style (`compute(model=m, T1_terms=[...])`) still works and emits a
-`DeprecationWarning` naming its replacement. Those shims are scheduled for
-removal in a later release, so migrate when convenient.
 
 ## Quick start
 
