@@ -199,4 +199,12 @@ def test_registry_documentation_generates_from_current_source():
     assert completed.returncode == 0, completed.stdout + completed.stderr
     diagnostics = (REPO_ROOT / "docs/registry/diagnostics.md").read_text()
     assert "fairlms[construction-backends]" not in diagnostics
-    assert "not_implemented_in_this_release" in diagnostics
+    # The backend slots are implemented; the page names their reference backends
+    # and no longer describes them as unshipped.
+    assert "not_implemented_in_this_release" not in diagnostics
+    for reference in (
+        "HuggingFaceEmbeddingBackend",
+        "LanguageToolGrammarBackend",
+        "SpacyDependencyBackend",
+    ):
+        assert reference in diagnostics
