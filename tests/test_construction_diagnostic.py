@@ -1740,6 +1740,115 @@ def test_backend_slots_run_and_match_an_independent_recomputation():
     json.dumps(report.to_dict())
 
 
+def test_backend_revision_records_the_model_that_actually_ran():
+    """A lazily-loaded backend must not be recorded by its pre-load identity.
+
+    Both reference backends resolve their real version inside the first
+    ``encode()`` / ``count_errors()`` / ``depths()`` call, so reading
+    ``revision`` before that call records ``@unloaded`` -- and a component is
+    built once per audit, so that is the ordinary path. The recorded revision
+    is the only field saying which model produced the numbers.
+    """
+
+    class LazyBackend:
+        depth_definition = "stub depth"
+
+        def __init__(self):
+            self.loaded = False
+
+        @property
+        def revision(self):
+            return "model@" + ("resolved" if self.loaded else "unloaded")
+
+        def encode(self, texts):
+            self.loaded = True
+            return [[1.0, 0.0]] * len(texts)
+
+        def count_errors(self, texts):
+            self.loaded = True
+            return [1] * len(texts)
+
+        def depths(self, texts):
+            self.loaded = True
+            return [2] * len(texts)
+
+    cases = (
+        (lambda b: SemanticEquivalence(identity_mask=_mask(), backend=b), _paired()),
+        (lambda b: GrammarConsistency(backend=b), _paired()),
+        (lambda b: DependencyDepthDisparity(backend=b), _grouped()),
+    )
+    for build, evidence in cases:
+        backend = LazyBackend()
+        result = build(backend).compute(evidence, _spec())
+        assert result.status is DiagnosticStatus.READY
+        assert result.details["backend_revision"] == "model@resolved"
+        assert result.provenance["backend"]["revision"] == "model@resolved"
+
+
+def test_backend_revision_is_refreshed_even_when_the_call_fails():
+    """A backend can load and then raise; provenance must name what loaded."""
+
+    class LoadsThenFails:
+        def __init__(self):
+            self.loaded = False
+
+        @property
+        def revision(self):
+            return "model@" + ("resolved" if self.loaded else "unloaded")
+
+        def depths(self, texts):
+            self.loaded = True
+            raise RuntimeError("boom after load")
+
+    backend = LoadsThenFails()
+    result = DependencyDepthDisparity(backend=backend).compute(
+        _grouped(), _spec()
+    )
+    assert result.status is DiagnosticStatus.FAILED
+    assert result.reason_code == "backend_call_failed"
+    assert result.details["backend_revision"] == "model@resolved"
+
+
+def test_embedding_components_may_be_any_real_number_not_just_float():
+    """``_validate_vector_output`` follows the same numeric policy as counts.
+
+    The count validator accepts anything registered as ``numbers.Integral``,
+    so numpy integers pass. The vector validator used the concrete
+    ``(int, float)`` pair, which admitted ``numpy.float64`` -- a ``float``
+    subclass -- while rejecting ``numpy.float32``, the default dtype of
+    essentially every embedding model.
+    """
+    numpy = pytest.importorskip("numpy")
+
+    class Float32Backend:
+        revision = "float32@1"
+
+        def encode(self, texts):
+            rows = [[1.0, 0.0], [0.0, 1.0]]
+            return [
+                [numpy.float32(value) for value in rows[index % 2]]
+                for index in range(len(texts))
+            ]
+
+    result = SemanticEquivalence(
+        identity_mask=_mask(), backend=Float32Backend()
+    ).compute(_paired(), _spec())
+    assert result.status is DiagnosticStatus.READY
+    assert all(isinstance(value, float) for value in (result.value,))
+
+    class ComplexBackend:
+        revision = "complex@1"
+
+        def encode(self, texts):
+            return [[complex(1, 2), complex(0, 0)] for _ in texts]
+
+    refused = SemanticEquivalence(
+        identity_mask=_mask(), backend=ComplexBackend()
+    ).compute(_paired(), _spec())
+    assert refused.status is DiagnosticStatus.FAILED
+    assert refused.reason_code == "backend_output_invalid"
+
+
 def test_a_supplied_backend_must_satisfy_the_slot_protocol():
     class NoRevision:
         def encode(self, texts):

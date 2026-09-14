@@ -110,12 +110,14 @@ class WordSets:
 
     Example
     -------
-    >>> WordSets(
+    >>> sets = WordSets(
     ...     target_1=["Adam", "Chip"],
     ...     target_2=["Alonzo", "Jamel"],
     ...     attribute_1=["freedom", "health"],
     ...     attribute_2=["abuse", "murder"],
     ... )
+    >>> sets.target_1              # lists are normalized to tuples
+    ('Adam', 'Chip')
     """
 
     target_1: Sequence[str]

@@ -112,6 +112,13 @@ version = { attr = "fairlms._version.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# `fairlms/definition/` holds 33 `main.py` and 25 `stimuli.py` files in sibling
+# directories. Under the default "prepend" import mode pytest names a module by
+# its basename, so collecting the package -- `pytest --doctest-modules fairlms/`
+# -- aborts with 56 "import file mismatch" errors and every doctest in the
+# library goes unrun. importlib mode derives the module name from the full path
+# instead, so the duplicate basenames stop colliding.
+addopts = ["--import-mode=importlib"]
 filterwarnings = [
     # Surface accidental use of the deprecated keyword API inside the library
     # itself; tests that exercise it opt in with pytest.warns.

@@ -24,7 +24,7 @@ import math
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from numbers import Integral
+from numbers import Integral, Real
 from types import MappingProxyType
 from typing import (
     Any,
@@ -2034,6 +2034,32 @@ def _call_backend(callable_: Any, texts: Sequence[str]) -> tuple[Any, Optional[s
         return None, f"{type(exc).__name__}: {exc}"
 
 
+def _record_backend_revision(
+    backend: Any, *, details: dict[str, Any], provenance: Mapping[str, Any]
+) -> None:
+    """Re-read ``revision`` after the backend has actually run.
+
+    Both reference backends resolve their real identity lazily: the spaCy
+    pipeline version and the Hub commit hash are only known once ``_load()``
+    has run, and ``_load()`` runs inside the first ``depths()`` / ``encode()``
+    call. Reading ``revision`` beforehand therefore records
+    ``pipeline=en_core_web_sm@unloaded`` or ``@default`` -- and since a
+    component is built once per audit, that is the ordinary case rather than
+    an edge case. The recorded revision is the one field that says which model
+    produced the numbers, so it is refreshed here, on every path out of the
+    call, including the failure paths where a backend may have loaded and then
+    raised.
+
+    A non-ready ``plan`` is deliberately left alone: planning does no work by
+    contract, so its pre-load revision is honest about what had run.
+    """
+    revision = str(backend.revision)
+    details["backend_revision"] = revision
+    recorded = provenance.get("backend")
+    if isinstance(recorded, dict):
+        recorded["revision"] = revision
+
+
 def _validate_count_output(
     output: Any, *, expected: int, what: str
 ) -> tuple[Optional[list[int]], Optional[str]]:
@@ -2063,7 +2089,13 @@ def _validate_vector_output(
             return None, f"vector[{index}] is not a sequence of numbers."
         values: list[float] = []
         for component in vector:
-            if isinstance(component, bool) or not isinstance(component, (int, float)):
+            # `numbers.Real`, matching the `numbers.Integral` policy in
+            # `_validate_count_output`. The concrete `(int, float)` pair this
+            # replaced admitted `numpy.float64` -- which subclasses `float` --
+            # while rejecting `numpy.float32`, the default dtype of almost
+            # every embedding model, so the two sibling validators disagreed
+            # about what a number is and the failure looked arbitrary.
+            if isinstance(component, bool) or not isinstance(component, Real):
                 return None, f"vector[{index}] contains a non-numeric component."
             value = float(component)
             if not math.isfinite(value):
@@ -2232,6 +2264,7 @@ class SemanticEquivalence(DatasetDiagnostic):
             )
 
         output, error = _call_backend(backend.encode, masked)
+        _record_backend_revision(backend, details=base_details, provenance=provenance)
         if error is not None:
             return _backend_failure(
                 component=self.name,
@@ -2396,6 +2429,7 @@ class GrammarConsistency(DatasetDiagnostic):
         }
 
         output, error = _call_backend(backend.count_errors, evidence.texts)
+        _record_backend_revision(backend, details=base_details, provenance=provenance)
         if error is not None:
             return _backend_failure(
                 component=self.name,
@@ -2553,6 +2587,7 @@ class DependencyDepthDisparity(DatasetDiagnostic):
         }
 
         output, error = _call_backend(backend.depths, evidence.texts)
+        _record_backend_revision(backend, details=base_details, provenance=provenance)
         if error is not None:
             return _backend_failure(
                 component=self.name,
