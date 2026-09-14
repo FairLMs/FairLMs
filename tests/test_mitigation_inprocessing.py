@@ -244,8 +244,9 @@ class TestInfluenceGuidedSuppression:
     def test_the_penalty_is_proportional_to_normalized_influence(self):
         component = InfluenceGuidedSuppression().apply(None, self.CORPUS).result
         losses = torch.tensor([1.0, 1.0, 1.0, 1.0])
-        # Normalized: row 1 -> 2/2 = 1.0, row 3 -> 1/2 = 0.5.
-        assert component(losses, [0, 1, 2, 3]).item() == pytest.approx(1.5)
+        # Normalized: row 1 -> 2/2 = 1.0, row 3 -> 1/2 = 0.5. Negative, because
+        # added to the task loss the term ascends the flagged rows' loss.
+        assert component(losses, [0, 1, 2, 3]).item() == pytest.approx(-1.5)
 
     def test_lambda_scales_the_penalty_linearly(self):
         losses = torch.tensor([1.0, 1.0, 1.0, 1.0])
@@ -260,7 +261,7 @@ class TestInfluenceGuidedSuppression:
             InfluenceGuidedSuppression(normalize=False).apply(None, self.CORPUS).result
         )
         losses = torch.tensor([1.0, 1.0, 1.0, 1.0])
-        assert component(losses, [0, 1, 2, 3]).item() == pytest.approx(3.0)
+        assert component(losses, [0, 1, 2, 3]).item() == pytest.approx(-3.0)
 
     def test_negative_influence_is_used_by_magnitude(self):
         corpus = InfluenceScoredCorpus(
@@ -269,7 +270,32 @@ class TestInfluenceGuidedSuppression:
         component = (
             InfluenceGuidedSuppression(normalize=False).apply(None, corpus).result
         )
-        assert component(torch.tensor([1.0, 1.0]), [0, 1]).item() == pytest.approx(2.0)
+        # Magnitude 2.0 from |-2.0|; the sign of the term is the suppression
+        # direction and does not follow the sign of the influence score.
+        assert component(torch.tensor([1.0, 1.0]), [0, 1]).item() == pytest.approx(-2.0)
+
+    def test_it_suppresses_rather_than_reinforces_the_flagged_rows(self):
+        # The property the component exists for, checked through a real
+        # composition rather than trusted. Magnitude tests alone cannot see it:
+        # a sign error passes every one of them while training the model to fit
+        # the harmful examples *harder*, which is the exact opposite of the
+        # intervention. Two rows with identical loss, one flagged, one not.
+        corpus = InfluenceScoredCorpus(
+            n_examples=2, flagged=[0], influence=[1.0], source="t"
+        )
+        component = InfluenceGuidedSuppression(lambda_=1.0).apply(None, corpus).result
+
+        logits = torch.zeros(2, requires_grad=True)
+        per_example = torch.nn.functional.binary_cross_entropy_with_logits(
+            logits, torch.tensor([1.0, 1.0]), reduction="none"
+        )
+        total = per_example.mean() + component(per_example, [0, 1])
+        total.backward()
+
+        flagged, benign = logits.grad[0].item(), logits.grad[1].item()
+        # The benign row is fitted; the flagged row is pushed the other way.
+        assert benign < 0
+        assert flagged > 0
 
     def test_it_is_differentiable(self):
         component = InfluenceGuidedSuppression().apply(None, self.CORPUS).result

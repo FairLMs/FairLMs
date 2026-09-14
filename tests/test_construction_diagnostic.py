@@ -973,12 +973,103 @@ def test_b_frame_is_blocked_without_a_predicate_and_ready_with_one():
     assert details["frame_name"] == "self_identification"
     assert details["predicate_kind"] == "declared_patterns"
     assert details["replayable"] is True
-    assert details["paper_alignment"] == "paper_exact"
+    assert details["paper_alignment"] == "paper_phrase_set_word_anchored"
     assert details["unit"] == "proportion"
     assert details["widest_pair"] == ["feminine", "masculine"]
     predicate_provenance = ready.to_dict()["provenance"]["frame_predicate"]
-    assert predicate_provenance["patterns"] == ["i am", "i'm", "as a", "as an"]
-    assert predicate_provenance["match_mode"] == "substring"
+    # The paper's four phrases, one anchored pattern each, so the recorded
+    # patterns stay one-to-one with the phrase set they came from.
+    assert predicate_provenance["patterns"] == [
+        r"\bi am\b",
+        r"\bi'm\b",
+        r"\bas a\b",
+        r"\bas an\b",
+    ]
+    assert predicate_provenance["match_mode"] == "regex"
+
+
+def test_the_canonical_frame_does_not_fire_inside_ordinary_words():
+    """``as a`` must not match ``was a``, nor ``i am`` match ``Hawaii amazing``.
+
+    Read as unanchored substrings the paper's phrases fire inside common
+    words, and because b_frame reports the *gap* between group rates the
+    error does not cancel out: it tracks whichever group happens to use more
+    past-tense ``was a`` phrasing. Every fixture in this file uses genuine
+    phrases, which is precisely why an unanchored predicate passed them all.
+    """
+    for text in (
+        "he was a doctor",
+        "she has an idea",
+        "it was an accident",
+        "the road was among trees",
+        "overseas and abroad",
+        "Thomas Ann arrived",
+        "Hawaii amazing",
+    ):
+        assert not SELF_IDENTIFICATION_FRAME.matches(text), text
+
+    for text in (
+        "i am a nurse",
+        "i'm a teacher",
+        "as a nurse, I work hard",
+        "as an engineer I signed off",
+        "I AM the lead",
+        "I'M here",
+    ):
+        assert SELF_IDENTIFICATION_FRAME.matches(text), text
+
+
+def test_b_frame_reports_no_disparity_when_no_text_self_identifies():
+    """The end-to-end consequence: a corpus with no framing scores 0.0.
+
+    One group is described in the past tense and the other in the present,
+    which is a grammatical difference and not a framing one. An unanchored
+    predicate scored this 0.75.
+    """
+    grouped = _grouped(
+        rows=(
+            ("feminine", "she was a nurse at the clinic"),
+            ("feminine", "she was a teacher for years"),
+            ("feminine", "she was an engineer downtown"),
+            ("feminine", "the clinic opened early"),
+            ("masculine", "he works at the clinic"),
+            ("masculine", "he teaches downtown"),
+            ("masculine", "the report went out"),
+            ("masculine", "the office closed early"),
+        )
+    )
+    report = audit_construction(
+        _evidence(grouped=grouped),
+        _spec(),
+        axis=AXIS,
+        diagnostics=(FramingDisparity(predicate=SELF_IDENTIFICATION_FRAME),),
+    )
+
+    result = report.components["b_frame"]
+    assert result.status is DiagnosticStatus.READY
+    assert result.value == 0.0
+    assert result.details["group_frame_counts"] == {"feminine": 0, "masculine": 0}
+
+
+def test_the_unanchored_substring_reading_stays_declarable_and_is_labelled():
+    """A caller who needs bit-comparability with a published value can ask.
+
+    The label is how the report admits which estimand was measured, so the
+    two readings must not share one alignment string.
+    """
+    literal = FramePredicate(
+        frame_name="self_identification",
+        definition="The paper's phrase set read as unanchored substrings.",
+        patterns=("i am", "i'm", "as a", "as an"),
+        match_mode="substring",
+    )
+    assert literal.paper_alignment == "paper_exact"
+    assert literal.matches("he was a doctor")
+
+    assert SELF_IDENTIFICATION_FRAME.paper_alignment == "paper_phrase_set_word_anchored"
+    assert not SELF_IDENTIFICATION_FRAME.matches("he was a doctor")
+    # Different estimands must not collide in provenance.
+    assert literal.predicate_digest != SELF_IDENTIFICATION_FRAME.predicate_digest
 
 
 def test_b_frame_accepts_a_declared_regex_predicate():

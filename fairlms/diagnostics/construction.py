@@ -562,6 +562,24 @@ class FrameMatchMode(str, Enum):
     REGEX = "regex"
 
 
+#: The paper's canonical self-identification phrase set, in the paper's order.
+_PAPER_FRAME_PHRASES: Final = ("i am", "i'm", "as a", "as an")
+
+#: The same phrase set anchored at word boundaries, which is what
+#: :data:`SELF_IDENTIFICATION_FRAME` ships. Read as unanchored substrings,
+#: ``"as a"`` and ``"as an"`` fire inside ordinary words -- ``"he w-as a-
+#: doctor"``, ``"she h-as an- idea"``, ``"overse-as an-d abroad"`` -- and
+#: ``"i am"`` fires inside ``"Hawai-i am-azing"``. Those are not framing
+#: choices, so matching them inflates every group's frame rate. Because
+#: b_frame reports the *gap* between group rates the error does not cancel:
+#: it tracks whichever group happens to use more past-tense ``"was a"``
+#: phrasing, manufacturing exactly the construction artifact the component
+#: exists to detect. One pattern per phrase, rather than a merged
+#: ``\bas an?\b``, keeps the recorded patterns one-to-one with the paper's
+#: four phrases for the audit trail.
+_PAPER_FRAME_PATTERNS: Final = (r"\bi am\b", r"\bi'm\b", r"\bas a\b", r"\bas an\b")
+
+
 @dataclass(frozen=True, kw_only=True)
 class FramePredicate:
     """Declared, fully serializable, replayable framing predicate."""
@@ -668,12 +686,33 @@ class FramePredicate:
 
     @property
     def paper_alignment(self) -> str:
-        """Classify the predicate against the paper's canonical frame set."""
-        if (
-            self.match_mode is FrameMatchMode.SUBSTRING
-            and self.case_fold
-            and tuple(self.patterns) == ("i am", "i'm", "as a", "as an")
-        ):
+        """Classify the predicate against the paper's canonical frame set.
+
+        Three outcomes rather than two, because "the paper's phrase set" and
+        "the paper's phrase set read as raw substrings" are different
+        estimands and only one of them is worth shipping:
+
+        ``paper_phrase_set_word_anchored``
+            The canonical phrases matched at word boundaries. What
+            :data:`SELF_IDENTIFICATION_FRAME` ships.
+        ``paper_exact``
+            The canonical phrases read as unanchored substrings, which is
+            literally what a published implementation does and therefore the
+            only setting whose numbers are bit-comparable to a published
+            value. It also fires inside ``"was a"`` and ``"has an"``; a caller
+            who needs that comparability can still declare it, and this label
+            is how the report says so.
+        ``generalized_frame_predicate``
+            Anything else.
+        """
+        if not self.case_fold:
+            return "generalized_frame_predicate"
+        patterns = tuple(self.patterns)
+        if self.match_mode is FrameMatchMode.REGEX:
+            if patterns == _PAPER_FRAME_PATTERNS:
+                return "paper_phrase_set_word_anchored"
+            return "generalized_frame_predicate"
+        if patterns == _PAPER_FRAME_PHRASES:
             return "paper_exact"
         return "generalized_frame_predicate"
 
@@ -785,10 +824,13 @@ SELF_IDENTIFICATION_FRAME: Final = FramePredicate(
     definition=(
         "A text frames the subject in the first person or as a member of a "
         "category, detected by the paper's canonical self-identification "
-        "substring set."
+        "phrase set matched at word boundaries. The phrases are the paper's; "
+        "the word anchoring is a declared divergence from reading them as raw "
+        "substrings, which would also fire inside 'was a', 'has an' and "
+        "'Hawaii amazing' and so report framing where none occurs."
     ),
-    patterns=("i am", "i'm", "as a", "as an"),
-    match_mode=FrameMatchMode.SUBSTRING,
+    patterns=_PAPER_FRAME_PATTERNS,
+    match_mode=FrameMatchMode.REGEX,
     case_fold=True,
 )
 
