@@ -148,9 +148,9 @@ CONSTRUCTION_BACKEND_REQUIREMENTS: Final[Mapping[str, Mapping[str, str]]] = (
                     "reason_code": "embedding_backend_unavailable",
                     "required_backend": "sentence_embedding",
                     "required_protocol": "EmbeddingBackend",
-                    "availability": "not_implemented_in_this_release",
+                    "availability": "optional_backend",
                     "required_view": "paired_texts",
-                    "milestone": "P2C-06",
+                    "milestone": "0.5.0",
                 }
             ),
             "b_gram": MappingProxyType(
@@ -158,9 +158,9 @@ CONSTRUCTION_BACKEND_REQUIREMENTS: Final[Mapping[str, Mapping[str, str]]] = (
                     "reason_code": "grammar_backend_unavailable",
                     "required_backend": "grammar_checker",
                     "required_protocol": "GrammarCheckerBackend",
-                    "availability": "not_implemented_in_this_release",
+                    "availability": "optional_backend",
                     "required_view": "paired_texts",
-                    "milestone": "P2C-06",
+                    "milestone": "0.5.0",
                 }
             ),
             "b_diff_dep": MappingProxyType(
@@ -168,9 +168,9 @@ CONSTRUCTION_BACKEND_REQUIREMENTS: Final[Mapping[str, Mapping[str, str]]] = (
                     "reason_code": "dependency_parser_backend_unavailable",
                     "required_backend": "dependency_parser",
                     "required_protocol": "DependencyParserBackend",
-                    "availability": "not_implemented_in_this_release",
+                    "availability": "optional_backend",
                     "required_view": "grouped_texts",
-                    "milestone": "P2C-06",
+                    "milestone": "0.5.0",
                 }
             ),
         }
@@ -181,16 +181,18 @@ _BACKEND_BLOCKED_REASONS: Final[Mapping[str, str]] = MappingProxyType(
     {
         "b_equiv": (
             "b_equiv requires a sentence-embedding backend; no EmbeddingBackend "
-            "implementation is available in this installation."
+            "was supplied. Pass backend=..., for example "
+            "fairlms.diagnostics.backends.HuggingFaceEmbeddingBackend()."
         ),
         "b_gram": (
             "b_gram requires a grammar-checking backend; no GrammarCheckerBackend "
-            "implementation is available in this installation."
+            "was supplied. Pass backend=..., for example "
+            "fairlms.diagnostics.backends.LanguageToolGrammarBackend()."
         ),
         "b_diff_dep": (
             "b_diff_dep requires a dependency-parser backend; no "
-            "DependencyParserBackend implementation is available in this "
-            "installation."
+            "DependencyParserBackend was supplied. Pass backend=..., for example "
+            "fairlms.diagnostics.backends.SpacyDependencyBackend()."
         ),
     }
 )
@@ -1946,52 +1948,701 @@ class TemplateImbalance(DatasetDiagnostic):
 
 
 # --------------------------------------------------------------------------
-# Backend-dependent slots
+# Backend-dependent components: b_equiv, b_gram, b_diff_dep
 # --------------------------------------------------------------------------
 
 
-def _backend_slot_result(
-    slot: str,
-    *,
-    spec: DatasetAuditSpec,
-    axis: str,
-    view_present: bool,
-) -> ComponentResult:
-    """Synthesize one backend-dependent slot without a class or a registry row.
-
-    Geometry is always checked before the backend, so an inapplicable
-    component never advertises a missing dependency. A missing backend blocks
-    only this slot: it never raises and never changes another slot's status.
-    """
+def _backend_requirement_details(slot: str) -> dict[str, Any]:
     requirement = CONSTRUCTION_BACKEND_REQUIREMENTS[slot]
-    view = requirement["required_view"]
-    provenance = {"backend_requirement": dict(requirement)}
+    return {
+        "slot": slot,
+        "required_backend": requirement["required_backend"],
+        "required_protocol": requirement["required_protocol"],
+        "availability": requirement["availability"],
+        "milestone": requirement["milestone"],
+    }
 
-    prefix = _shared_plan_prefix(
-        component=slot, spec=spec, axis=axis, check_axis=False
-    )
-    if prefix is not None:
-        return _non_ready_result(prefix, spec=spec, provenance=provenance)
 
-    if not view_present:
-        return _view_not_supplied_result(
-            slot, axis=axis, view=view, provenance=provenance
-        )
-
-    return ComponentResult(
+def _missing_backend_plan(
+    slot: str, *, axis: str, extra: Optional[Mapping[str, Any]] = None
+) -> ComponentPlan:
+    """Block a backend-dependent slot whose backend was not supplied."""
+    requirement = CONSTRUCTION_BACKEND_REQUIREMENTS[slot]
+    details = _backend_requirement_details(slot)
+    details["axis"] = axis
+    if extra:
+        details.update(extra)
+    return ComponentPlan(
         component=slot,
         status=DiagnosticStatus.BLOCKED,
-        details={
-            "slot": slot,
-            "required_backend": requirement["required_backend"],
-            "required_protocol": requirement["required_protocol"],
-            "availability": requirement["availability"],
-            "milestone": requirement["milestone"],
-        },
-        provenance=provenance,
         reason_code=requirement["reason_code"],
         reason=_BACKEND_BLOCKED_REASONS[slot],
+        details=details,
     )
+
+
+def _check_backend(backend: Any, *, slot: str, method: str) -> None:
+    """Validate a supplied backend against the slot's protocol, structurally."""
+    if backend is None:
+        return
+    protocol = CONSTRUCTION_BACKEND_REQUIREMENTS[slot]["required_protocol"]
+    revision = getattr(backend, "revision", None)
+    if not callable(getattr(backend, method, None)) or not (
+        isinstance(revision, str) and revision.strip()
+    ):
+        raise TypeError(
+            f"backend for {slot} must implement {protocol}: a non-empty str "
+            f"`revision` and a callable `{method}`; got {type(backend).__name__}."
+        )
+
+
+def _backend_provenance(backend: Any, *, slot: str) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "protocol": CONSTRUCTION_BACKEND_REQUIREMENTS[slot]["required_protocol"],
+        "implementation": f"{type(backend).__module__}.{type(backend).__qualname__}",
+        "revision": str(backend.revision),
+    }
+    definition = getattr(backend, "depth_definition", None)
+    if isinstance(definition, str) and definition:
+        payload["depth_definition"] = definition
+    return payload
+
+
+def _backend_failure(
+    *,
+    component: str,
+    details: Mapping[str, Any],
+    provenance: Mapping[str, Any],
+    reason_code: str,
+    reason: str,
+) -> ComponentResult:
+    return ComponentResult(
+        component=component,
+        status=DiagnosticStatus.FAILED,
+        details=dict(details),
+        provenance=dict(provenance),
+        reason_code=reason_code,
+        reason=reason,
+    )
+
+
+def _call_backend(callable_: Any, texts: Sequence[str]) -> tuple[Any, Optional[str]]:
+    """Run one backend call, returning ``(output, error)``."""
+    try:
+        return callable_(list(texts)), None
+    except Exception as exc:  # a backend is foreign code; its failure is a result
+        return None, f"{type(exc).__name__}: {exc}"
+
+
+def _validate_count_output(
+    output: Any, *, expected: int, what: str
+) -> tuple[Optional[list[int]], Optional[str]]:
+    if isinstance(output, (str, bytes)) or not isinstance(output, Sequence):
+        return None, f"the backend returned {type(output).__name__} instead of a sequence of {what}."
+    if len(output) != expected:
+        return None, f"the backend returned {len(output)} values for {expected} texts."
+    values: list[int] = []
+    for index, value in enumerate(output):
+        if isinstance(value, bool) or not isinstance(value, Integral) or int(value) < 0:
+            return None, f"{what}[{index}] must be a non-negative integer, got {value!r}."
+        values.append(int(value))
+    return values, None
+
+
+def _validate_vector_output(
+    output: Any, *, expected: int
+) -> tuple[Optional[list[list[float]]], Optional[str]]:
+    if isinstance(output, (str, bytes)) or not isinstance(output, Sequence):
+        return None, f"the backend returned {type(output).__name__} instead of a sequence of vectors."
+    if len(output) != expected:
+        return None, f"the backend returned {len(output)} vectors for {expected} texts."
+    vectors: list[list[float]] = []
+    width: Optional[int] = None
+    for index, vector in enumerate(output):
+        if isinstance(vector, (str, bytes)) or not isinstance(vector, Sequence):
+            return None, f"vector[{index}] is not a sequence of numbers."
+        values: list[float] = []
+        for component in vector:
+            if isinstance(component, bool) or not isinstance(component, (int, float)):
+                return None, f"vector[{index}] contains a non-numeric component."
+            value = float(component)
+            if not math.isfinite(value):
+                return None, f"vector[{index}] contains a non-finite component."
+            values.append(value)
+        if not values:
+            return None, f"vector[{index}] is empty."
+        if width is None:
+            width = len(values)
+        elif len(values) != width:
+            return None, "the backend returned vectors of different widths."
+        vectors.append(values)
+    return vectors, None
+
+
+def _cosine(left: Sequence[float], right: Sequence[float]) -> Optional[float]:
+    """Cosine similarity, or ``None`` when either vector has zero norm."""
+    dot = math.fsum(a * b for a, b in zip(left, right))
+    left_norm = math.sqrt(math.fsum(a * a for a in left))
+    right_norm = math.sqrt(math.fsum(b * b for b in right))
+    if left_norm == 0.0 or right_norm == 0.0:
+        return None
+    value = dot / (left_norm * right_norm)
+    return max(-1.0, min(1.0, value))
+
+
+def _paired_evidence_metadata(evidence: PairedTexts) -> dict[str, Any]:
+    return {
+        "axis": evidence.axis,
+        "source": evidence.source,
+        "pairing_basis": evidence.pairing_basis,
+        "condition_roles": list(evidence.condition_roles),
+        "pair_count": evidence.pair_count,
+        "provenance": dict(evidence.provenance),
+    }
+
+
+@dataclass(frozen=True, kw_only=True)
+class SemanticEquivalence(DatasetDiagnostic):
+    """One minus the mean cosine similarity of identity-masked pair sides.
+
+    Implements the paper's :math:`B_{\\mathrm{equiv}} = 1 - \\mathbb{E}[\\cos(E(M(x)),
+    E(M(x')))]`. Both the identity mask and the embedding backend are estimand
+    declarations: neither is inferred, and the component is ``blocked`` by
+    name until both are supplied.
+    """
+
+    name: ClassVar[str] = "b_equiv"
+    identity_mask: Optional[IdentityMaskConfig] = None
+    backend: Optional[EmbeddingBackend] = None
+
+    def __post_init__(self) -> None:
+        if self.identity_mask is not None and not isinstance(
+            self.identity_mask, IdentityMaskConfig
+        ):
+            raise TypeError(
+                "identity_mask must be an IdentityMaskConfig or None, got "
+                f"{type(self.identity_mask).__name__}."
+            )
+        _check_backend(self.backend, slot=self.name, method="encode")
+
+    @property
+    def paper_alignment(self) -> str:
+        """The formula is the paper's; the value depends on the declared backend."""
+        return "paper_exact_given_backend"
+
+    def _provenance(self, evidence: PairedTexts) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "evidence": _paired_evidence_metadata(evidence),
+            "backend_requirement": dict(CONSTRUCTION_BACKEND_REQUIREMENTS[self.name]),
+        }
+        if self.identity_mask is not None:
+            payload["identity_mask"] = self.identity_mask.to_dict()
+        if self.backend is not None:
+            payload["backend"] = _backend_provenance(self.backend, slot=self.name)
+        return payload
+
+    def plan(self, evidence: PairedTexts, spec: DatasetAuditSpec) -> ComponentPlan:
+        """Decide b_equiv applicability without encoding any text."""
+        if not isinstance(evidence, PairedTexts):
+            raise TypeError(
+                f"evidence must be PairedTexts, got {type(evidence).__name__}."
+            )
+        if not isinstance(spec, DatasetAuditSpec):
+            raise TypeError(
+                f"spec must be DatasetAuditSpec, got {type(spec).__name__}."
+            )
+        prefix = _shared_plan_prefix(
+            component=self.name, spec=spec, axis=evidence.axis
+        )
+        if prefix is not None:
+            return prefix
+        if self.backend is None:
+            return _missing_backend_plan(
+                self.name,
+                axis=evidence.axis,
+                extra={"pair_count": evidence.pair_count},
+            )
+        if self.identity_mask is None:
+            return ComponentPlan(
+                component=self.name,
+                status=DiagnosticStatus.BLOCKED,
+                reason_code="missing_identity_mask",
+                reason=(
+                    "b_equiv compares the two sides after masking the declared "
+                    "identity terms; identity terms are never inferred from the "
+                    "paired texts."
+                ),
+                details={"axis": evidence.axis, "pair_count": evidence.pair_count},
+            )
+        return ComponentPlan(
+            component=self.name,
+            status=DiagnosticStatus.READY,
+            details={
+                "axis": evidence.axis,
+                "pair_count": evidence.pair_count,
+                "condition_roles": list(evidence.condition_roles),
+                "pairing_basis": evidence.pairing_basis,
+                "backend_revision": str(self.backend.revision),
+            },
+        )
+
+    def compute(self, evidence: PairedTexts, spec: DatasetAuditSpec) -> ComponentResult:
+        """Embed the masked sides and report one minus the mean cosine."""
+        plan = self.plan(evidence, spec)
+        provenance = self._provenance(evidence)
+        if plan.status is not DiagnosticStatus.READY:
+            return _non_ready_result(plan, spec=spec, provenance=provenance)
+
+        mask = self.identity_mask
+        backend = self.backend
+        assert mask is not None and backend is not None  # guaranteed by the plan
+
+        base_details = {
+            "axis": evidence.axis,
+            "pair_count": evidence.pair_count,
+            "condition_roles": list(evidence.condition_roles),
+            "pairing_basis": evidence.pairing_basis,
+            "backend_revision": str(backend.revision),
+        }
+
+        masked: list[str] = []
+        degenerate_ids: list[Any] = []
+        for start in range(0, evidence.total, 2):
+            left = " ".join(mask.mask(evidence.texts[start]))
+            right = " ".join(mask.mask(evidence.texts[start + 1]))
+            if not left or not right:
+                degenerate_ids.append(evidence.pair_ids[start])
+            masked.extend((left, right))
+        if degenerate_ids:
+            return ComponentResult(
+                component=self.name,
+                status=DiagnosticStatus.BLOCKED,
+                details={
+                    **base_details,
+                    "degenerate_pair_ids": list(degenerate_ids[:_MAX_LISTED_IDS]),
+                    "degenerate_pair_count": len(degenerate_ids),
+                },
+                provenance=provenance,
+                reason_code="degenerate_masked_pair",
+                reason=(
+                    "At least one pair side is empty after identity masking, so "
+                    "it has no content to embed; an empty side is blocked rather "
+                    "than embedded as an empty string."
+                ),
+            )
+
+        output, error = _call_backend(backend.encode, masked)
+        if error is not None:
+            return _backend_failure(
+                component=self.name,
+                details=base_details,
+                provenance=provenance,
+                reason_code="backend_call_failed",
+                reason=f"The embedding backend raised {error}",
+            )
+        vectors, problem = _validate_vector_output(output, expected=len(masked))
+        if vectors is None:
+            return _backend_failure(
+                component=self.name,
+                details=base_details,
+                provenance=provenance,
+                reason_code="backend_output_invalid",
+                reason=f"The embedding backend output is unusable: {problem}",
+            )
+
+        similarities: list[float] = []
+        zero_norm_ids: list[Any] = []
+        for index in range(0, len(vectors), 2):
+            similarity = _cosine(vectors[index], vectors[index + 1])
+            if similarity is None:
+                zero_norm_ids.append(evidence.pair_ids[index])
+                continue
+            similarities.append(similarity)
+        if zero_norm_ids:
+            return _backend_failure(
+                component=self.name,
+                details={
+                    **base_details,
+                    "zero_norm_pair_ids": list(zero_norm_ids[:_MAX_LISTED_IDS]),
+                    "zero_norm_pair_count": len(zero_norm_ids),
+                },
+                provenance=provenance,
+                reason_code="zero_norm_embedding",
+                reason=(
+                    "The backend returned an all-zero vector for at least one "
+                    "masked side, so its cosine similarity is undefined."
+                ),
+            )
+
+        mean_similarity = math.fsum(similarities) / len(similarities)
+        value = 1.0 - mean_similarity
+        if not math.isfinite(value):
+            return _numeric_failure(
+                component=self.name,
+                details=base_details,
+                provenance=provenance,
+                reason="The mean cosine similarity did not produce a finite value.",
+            )
+        distances = [1.0 - similarity for similarity in similarities]
+        return ComponentResult(
+            component=self.name,
+            status=DiagnosticStatus.READY,
+            value=value,
+            details={
+                **base_details,
+                "mean_cosine_similarity": mean_similarity,
+                "minimum_cosine_similarity": min(similarities),
+                "maximum_cosine_similarity": max(similarities),
+                "pairs_with_distance_above_0_10": sum(1 for d in distances if d > 0.10),
+                "pairs_with_distance_above_0_20": sum(1 for d in distances if d > 0.20),
+                "embedding_width": len(vectors[0]),
+                "identity_term_count": len(mask.identity_terms),
+                "estimator": "uniform_mass_per_pair",
+                "unit": "one_minus_mean_cosine_similarity",
+                "paper_alignment": self.paper_alignment,
+            },
+            assumptions=(
+                DESCRIPTIVE_INTERPRETATION,
+                "Similarity is measured between the identity-masked sides, so "
+                "the value reflects residual meaning differences the mask does "
+                "not cover, under the declared embedding model.",
+                "The counts above 0.10 and 0.20 use the paper's STS-based "
+                "reference points; they are descriptive anchors, not validated "
+                "fairness-audit thresholds.",
+                f"Pairing basis: {evidence.pairing_basis}",
+                f"Design stance: {_enum_value(spec.design_stance)}.",
+            ),
+            provenance=provenance,
+        )
+
+
+@dataclass(frozen=True, kw_only=True)
+class GrammarConsistency(DatasetDiagnostic):
+    """Mean absolute difference in grammatical-error counts within a pair.
+
+    Implements the paper's :math:`B_{\\mathrm{gram}} = \\mathbb{E}[|\\mathrm{err}(x)
+    - \\mathrm{err}(x')|]` over the unmasked pair sides. The grammar checker is
+    an estimand declaration and is never inferred.
+    """
+
+    name: ClassVar[str] = "b_gram"
+    backend: Optional[GrammarCheckerBackend] = None
+
+    def __post_init__(self) -> None:
+        _check_backend(self.backend, slot=self.name, method="count_errors")
+
+    @property
+    def paper_alignment(self) -> str:
+        """The formula is the paper's; the counts depend on the declared checker."""
+        return "paper_exact_given_backend"
+
+    def _provenance(self, evidence: PairedTexts) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "evidence": _paired_evidence_metadata(evidence),
+            "backend_requirement": dict(CONSTRUCTION_BACKEND_REQUIREMENTS[self.name]),
+        }
+        if self.backend is not None:
+            payload["backend"] = _backend_provenance(self.backend, slot=self.name)
+        return payload
+
+    def plan(self, evidence: PairedTexts, spec: DatasetAuditSpec) -> ComponentPlan:
+        """Decide b_gram applicability without checking any text."""
+        if not isinstance(evidence, PairedTexts):
+            raise TypeError(
+                f"evidence must be PairedTexts, got {type(evidence).__name__}."
+            )
+        if not isinstance(spec, DatasetAuditSpec):
+            raise TypeError(
+                f"spec must be DatasetAuditSpec, got {type(spec).__name__}."
+            )
+        prefix = _shared_plan_prefix(
+            component=self.name, spec=spec, axis=evidence.axis
+        )
+        if prefix is not None:
+            return prefix
+        if self.backend is None:
+            return _missing_backend_plan(
+                self.name,
+                axis=evidence.axis,
+                extra={"pair_count": evidence.pair_count},
+            )
+        return ComponentPlan(
+            component=self.name,
+            status=DiagnosticStatus.READY,
+            details={
+                "axis": evidence.axis,
+                "pair_count": evidence.pair_count,
+                "condition_roles": list(evidence.condition_roles),
+                "pairing_basis": evidence.pairing_basis,
+                "backend_revision": str(self.backend.revision),
+            },
+        )
+
+    def compute(self, evidence: PairedTexts, spec: DatasetAuditSpec) -> ComponentResult:
+        """Count errors on both sides and report the mean absolute difference."""
+        plan = self.plan(evidence, spec)
+        provenance = self._provenance(evidence)
+        if plan.status is not DiagnosticStatus.READY:
+            return _non_ready_result(plan, spec=spec, provenance=provenance)
+
+        backend = self.backend
+        assert backend is not None  # guaranteed by the plan
+        base_details = {
+            "axis": evidence.axis,
+            "pair_count": evidence.pair_count,
+            "condition_roles": list(evidence.condition_roles),
+            "pairing_basis": evidence.pairing_basis,
+            "backend_revision": str(backend.revision),
+        }
+
+        output, error = _call_backend(backend.count_errors, evidence.texts)
+        if error is not None:
+            return _backend_failure(
+                component=self.name,
+                details=base_details,
+                provenance=provenance,
+                reason_code="backend_call_failed",
+                reason=f"The grammar backend raised {error}",
+            )
+        counts, problem = _validate_count_output(
+            output, expected=evidence.total, what="error counts"
+        )
+        if counts is None:
+            return _backend_failure(
+                component=self.name,
+                details=base_details,
+                provenance=provenance,
+                reason_code="backend_output_invalid",
+                reason=f"The grammar backend output is unusable: {problem}",
+            )
+
+        differences = [
+            abs(counts[index] - counts[index + 1])
+            for index in range(0, evidence.total, 2)
+        ]
+        value = math.fsum(differences) / len(differences)
+        if not math.isfinite(value):
+            return _numeric_failure(
+                component=self.name,
+                details=base_details,
+                provenance=provenance,
+                reason="The mean error-count difference is not a finite value.",
+            )
+
+        conditions = getattr(evidence, "conditions", None)
+        per_condition_totals: dict[str, list[int]] = {}
+        if isinstance(conditions, Sequence) and len(conditions) == evidence.total:
+            for label, count in zip(conditions, counts):
+                per_condition_totals.setdefault(str(label), []).append(count)
+        mean_errors_by_condition = {
+            label: math.fsum(values) / len(values)
+            for label, values in sorted(per_condition_totals.items())
+        }
+        return ComponentResult(
+            component=self.name,
+            status=DiagnosticStatus.READY,
+            value=value,
+            details={
+                **base_details,
+                "mean_absolute_error_difference": value,
+                "pairs_with_difference": sum(1 for d in differences if d > 0),
+                "maximum_absolute_error_difference": max(differences),
+                "mean_error_count": math.fsum(counts) / len(counts),
+                "mean_error_count_by_condition": mean_errors_by_condition,
+                "estimator": "uniform_mass_per_pair",
+                "unit": "grammar_error_count_difference",
+                "paper_alignment": self.paper_alignment,
+            },
+            assumptions=(
+                DESCRIPTIVE_INTERPRETATION,
+                "Error counts are those reported by the declared grammar checker "
+                "on the unmasked pair sides; the value is comparable only across "
+                "audits that declare the same checker revision.",
+                f"Pairing basis: {evidence.pairing_basis}",
+                f"Design stance: {_enum_value(spec.design_stance)}.",
+            ),
+            provenance=provenance,
+        )
+
+
+@dataclass(frozen=True, kw_only=True)
+class DependencyDepthDisparity(DatasetDiagnostic):
+    """Maximum pairwise group mean dependency-depth gap over the pooled mean.
+
+    Implements the paper's :math:`B_{\\mathrm{diff\\text{-}dep}}` with the same
+    denominator rule as :class:`LengthDisparity`: the sample-weighted pooled
+    mean depth over every text. The parser is an estimand declaration.
+    """
+
+    name: ClassVar[str] = "b_diff_dep"
+    backend: Optional[DependencyParserBackend] = None
+
+    def __post_init__(self) -> None:
+        _check_backend(self.backend, slot=self.name, method="depths")
+
+    @property
+    def paper_alignment(self) -> str:
+        """The formula is the paper's; the depths depend on the declared parser."""
+        return "paper_exact_given_backend"
+
+    def _provenance(self, evidence: GroupedTexts) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "evidence": _grouped_evidence_metadata(evidence),
+            "backend_requirement": dict(CONSTRUCTION_BACKEND_REQUIREMENTS[self.name]),
+        }
+        if self.backend is not None:
+            payload["backend"] = _backend_provenance(self.backend, slot=self.name)
+        return payload
+
+    def plan(self, evidence: GroupedTexts, spec: DatasetAuditSpec) -> ComponentPlan:
+        """Decide b_diff_dep applicability without parsing any text."""
+        if not isinstance(evidence, GroupedTexts):
+            raise TypeError(
+                f"evidence must be GroupedTexts, got {type(evidence).__name__}."
+            )
+        if not isinstance(spec, DatasetAuditSpec):
+            raise TypeError(
+                f"spec must be DatasetAuditSpec, got {type(spec).__name__}."
+            )
+        prefix = _shared_plan_prefix(
+            component=self.name, spec=spec, axis=evidence.axis
+        )
+        if prefix is not None:
+            return prefix
+        if self.backend is None:
+            return _missing_backend_plan(
+                self.name,
+                axis=evidence.axis,
+                extra={"support": list(evidence.support), "sample_count": evidence.total},
+            )
+        empty_groups = _empty_declared_groups(evidence.group_sample_counts)
+        if empty_groups:
+            return _empty_group_plan(
+                component=self.name,
+                axis=evidence.axis,
+                empty_groups=empty_groups,
+                support=evidence.support,
+            )
+        return ComponentPlan(
+            component=self.name,
+            status=DiagnosticStatus.READY,
+            details={
+                "axis": evidence.axis,
+                "support": list(evidence.support),
+                "sample_count": evidence.total,
+                "backend_revision": str(self.backend.revision),
+            },
+        )
+
+    def compute(
+        self, evidence: GroupedTexts, spec: DatasetAuditSpec
+    ) -> ComponentResult:
+        """Parse every text and report the normalized group depth disparity."""
+        plan = self.plan(evidence, spec)
+        provenance = self._provenance(evidence)
+        if plan.status is not DiagnosticStatus.READY:
+            return _non_ready_result(plan, spec=spec, provenance=provenance)
+
+        backend = self.backend
+        assert backend is not None  # guaranteed by the plan
+        base_details: dict[str, Any] = {
+            "axis": evidence.axis,
+            "support": list(evidence.support),
+            "sample_count": evidence.total,
+            "backend_revision": str(backend.revision),
+        }
+
+        output, error = _call_backend(backend.depths, evidence.texts)
+        if error is not None:
+            return _backend_failure(
+                component=self.name,
+                details=base_details,
+                provenance=provenance,
+                reason_code="backend_call_failed",
+                reason=f"The dependency-parser backend raised {error}",
+            )
+        depths, problem = _validate_count_output(
+            output, expected=evidence.total, what="depths"
+        )
+        if depths is None:
+            return _backend_failure(
+                component=self.name,
+                details=base_details,
+                provenance=provenance,
+                reason_code="backend_output_invalid",
+                reason=f"The dependency-parser backend output is unusable: {problem}",
+            )
+
+        group_depth_totals = {label: 0 for label in evidence.support}
+        for label, depth in zip(evidence.groups, depths):
+            group_depth_totals[label] += depth
+        group_sample_counts = dict(evidence.group_sample_counts)
+        group_mean_depths = {
+            label: group_depth_totals[label] / group_sample_counts[label]
+            for label in evidence.support
+        }
+        max_gap, widest_pair = max_pairwise_gap(group_mean_depths)
+        total_depth = sum(depths)
+        # Same rule as b_diff_len: one pooled depth total over one pooled unit
+        # total, deliberately not the unweighted mean of per-group means.
+        pooled_mean_depth = total_depth / evidence.total
+
+        base_details.update(
+            {
+                "group_mean_depths": group_mean_depths,
+                "group_sample_counts": group_sample_counts,
+                "group_depth_totals": group_depth_totals,
+                "total_depth": total_depth,
+                "max_absolute_gap": max_gap,
+                "widest_pair": list(widest_pair) if widest_pair is not None else None,
+                "pooled_mean_depth": pooled_mean_depth,
+                "denominator_rule": "sample_weighted_pooled_mean",
+                "unit": "ratio_to_pooled_mean_depth",
+                "estimand": "normalized_maximum_pairwise_group_mean_depth_gap",
+                "paper_alignment": self.paper_alignment,
+            }
+        )
+        if pooled_mean_depth == 0.0:
+            return ComponentResult(
+                component=self.name,
+                status=DiagnosticStatus.FAILED,
+                details=base_details,
+                provenance=provenance,
+                reason_code="zero_depth_denominator",
+                reason=(
+                    "The sample-weighted pooled mean depth is zero, so the "
+                    "normalized disparity is undefined."
+                ),
+            )
+        value = max_gap / pooled_mean_depth
+        if not math.isfinite(value):
+            return _numeric_failure(
+                component=self.name,
+                details=base_details,
+                provenance=provenance,
+                reason="The normalized depth disparity is not a finite value.",
+            )
+        return ComponentResult(
+            component=self.name,
+            status=DiagnosticStatus.READY,
+            value=value,
+            details=base_details,
+            assumptions=(
+                DESCRIPTIVE_INTERPRETATION,
+                "Depth is whatever the declared parser backend reports per text; "
+                "the value is comparable only across audits that declare the "
+                "same parser revision.",
+                "The disparity denominator is the sample-weighted pooled mean "
+                "depth over every text, not an unweighted mean of group means.",
+                f"Design stance: {_enum_value(spec.design_stance)}.",
+            ),
+            provenance=provenance,
+        )
+
+
+# --------------------------------------------------------------------------
+# Backend-dependent slots
+# --------------------------------------------------------------------------
 
 
 def _view_not_supplied_result(
@@ -2040,7 +2691,10 @@ def construction_vector(report: DiagnosticReport) -> tuple[ComponentResult, ...]
 _DEFAULT_SLOT_CLASSES: Final[Mapping[str, type]] = MappingProxyType(
     {
         "b_min": MinimalPairResidual,
+        "b_equiv": SemanticEquivalence,
+        "b_gram": GrammarConsistency,
         "b_diff_len": LengthDisparity,
+        "b_diff_dep": DependencyDepthDisparity,
         "b_frame": FramingDisparity,
         "b_opt": OptionLengthBias,
         "b_temp": TemplateImbalance,
@@ -2067,12 +2721,6 @@ def _normalize_construction_diagnostics(
             raise ValueError(
                 f"diagnostics[{index}].name {name!r} is not a construction "
                 f"slot; expected one of {list(CONSTRUCTION_SLOTS)}."
-            )
-        if name in BACKEND_CONSTRUCTION_SLOTS:
-            raise ValueError(
-                f"{name!r} has no implementation in this release; the backend "
-                "slots are produced by audit_construction and are implemented "
-                "in P2C-06."
             )
         names.append(name)
         selected[name] = diagnostic
@@ -2106,7 +2754,7 @@ def audit_construction(
         slot: (
             supplied[slot] if slot in supplied else _DEFAULT_SLOT_CLASSES[slot]()
         )
-        for slot in LIGHTWEIGHT_CONSTRUCTION_SLOTS
+        for slot in CONSTRUCTION_SLOTS
     }
 
     views: dict[str, Any] = {}
@@ -2119,7 +2767,7 @@ def audit_construction(
             views_used[slot] = view_name
 
     results: dict[str, ComponentResult] = {}
-    for slot in LIGHTWEIGHT_CONSTRUCTION_SLOTS:
+    for slot in CONSTRUCTION_SLOTS:
         diagnostic = instances[slot]
         prefix = _shared_plan_prefix(
             component=slot, spec=spec, axis=axis, check_axis=False
@@ -2155,18 +2803,11 @@ def audit_construction(
                 ),
             )
 
-    for slot in BACKEND_CONSTRUCTION_SLOTS:
-        results[slot] = _backend_slot_result(
-            slot,
-            spec=spec,
-            axis=axis,
-            view_present=views[slot] is not None,
-        )
-
     blocked_backends = [
         slot
         for slot in BACKEND_CONSTRUCTION_SLOTS
         if results[slot].status is DiagnosticStatus.BLOCKED
+        and (results[slot].reason_code or "").endswith("_backend_unavailable")
     ]
     warnings: list[str] = [CONSTRUCTION_VECTOR_WARNING]
     if blocked_backends:
@@ -2196,14 +2837,14 @@ def audit_construction(
             "entry_point": "audit_construction",
             "axis": axis,
             "slot_order": list(CONSTRUCTION_SLOTS),
-            "implemented_slots": list(LIGHTWEIGHT_CONSTRUCTION_SLOTS),
+            "implemented_slots": list(CONSTRUCTION_SLOTS),
             "backend_slots": list(BACKEND_CONSTRUCTION_SLOTS),
             "target_name": evidence.target_name,
             "evidence_views": list(evidence.available_views),
             "views_used": dict(sorted(views_used.items())),
             "diagnostics": {
                 slot: type(instances[slot]).__qualname__
-                for slot in LIGHTWEIGHT_CONSTRUCTION_SLOTS
+                for slot in CONSTRUCTION_SLOTS
             },
         },
     )
@@ -2215,15 +2856,21 @@ __all__ = [
     "CONSTRUCTION_SLOTS",
     "LIGHTWEIGHT_CONSTRUCTION_SLOTS",
     "SELF_IDENTIFICATION_FRAME",
+    "DependencyDepthDisparity",
+    "DependencyParserBackend",
+    "EmbeddingBackend",
     "FrameMatchMode",
     "FramePredicate",
     "FramingDisparity",
+    "GrammarCheckerBackend",
+    "GrammarConsistency",
     "IdentityMaskConfig",
     "InjectedFramePredicate",
     "LengthDisparity",
     "MinimalPairResidual",
     "OptionLengthBias",
     "OptionRoleContrast",
+    "SemanticEquivalence",
     "TemplateImbalance",
     "TokenizationMode",
     "TokenizationRule",

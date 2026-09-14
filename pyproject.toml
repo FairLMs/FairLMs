@@ -75,6 +75,15 @@ Issues = "https://github.com/michaellarionov/FairLMs/issues"
 openai = [
     "openai>=1.0",
 ]
+grammar = [
+    "language-tool-python>=2.7",
+]
+parse = [
+    "spacy>=3.5",
+]
+nlp = [
+    "fairlms[grammar,parse]",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov",
@@ -82,7 +91,7 @@ dev = [
     "fairlms[openai]",
 ]
 all = [
-    "fairlms[openai,dev]",
+    "fairlms[openai,dev,nlp]",
     "accelerate>=0.30",
     "sentencepiece",
     "gender-guesser",

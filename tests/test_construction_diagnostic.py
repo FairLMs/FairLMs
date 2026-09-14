@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -25,10 +26,12 @@ from fairlms.diagnostics import (
     DatasetAuditSpec,
     DatasetDiagnostic,
     DatasetEvidence,
+    DependencyDepthDisparity,
     DiagnosticReport,
     DiagnosticStatus,
     FramePredicate,
     FramingDisparity,
+    GrammarConsistency,
     GroupedTexts,
     IdentityMaskConfig,
     InjectedFramePredicate,
@@ -39,6 +42,7 @@ from fairlms.diagnostics import (
     OptionRoleContrast,
     PairedTexts,
     ReportStatus,
+    SemanticEquivalence,
     TemplateGroups,
     TemplateImbalance,
     TokenizationMode,
@@ -224,18 +228,6 @@ class _ExplodingTemplateImbalance(TemplateImbalance):
         raise OverflowError("synthetic kernel failure")
 
 
-class _UnimplementedEmbeddingSlot(DatasetDiagnostic):
-    """A caller-supplied stand-in for a backend slot; must be refused."""
-
-    name = "b_equiv"
-
-    def plan(self, evidence, spec):  # pragma: no cover - never reached
-        raise AssertionError("a backend slot diagnostic must never be planned.")
-
-    def compute(self, evidence, spec):  # pragma: no cover - never reached
-        raise AssertionError("a backend slot diagnostic must never run.")
-
-
 # --------------------------------------------------------------------------
 # The vector is always eight slots, in the declared order
 # --------------------------------------------------------------------------
@@ -263,7 +255,7 @@ def test_report_always_carries_all_eight_slots_in_the_frozen_order():
         tuple(result.component for result in construction_vector(report))
         == CONSTRUCTION_SLOTS
     )
-    assert report.provenance["implemented_slots"] == LIGHTWEIGHT_CONSTRUCTION_SLOTS
+    assert report.provenance["implemented_slots"] == CONSTRUCTION_SLOTS
     assert report.provenance["backend_slots"] == BACKEND_CONSTRUCTION_SLOTS
 
     payload = report.to_dict()
@@ -286,9 +278,7 @@ def test_report_always_carries_all_eight_slots_in_the_frozen_order():
         "b_opt": "option_items",
         "b_temp": "template_groups",
     }
-    assert set(payload["provenance"]["diagnostics"]) == set(
-        LIGHTWEIGHT_CONSTRUCTION_SLOTS
-    )
+    assert set(payload["provenance"]["diagnostics"]) == set(CONSTRUCTION_SLOTS)
 
 
 def test_all_eight_slots_are_present_with_only_one_evidence_view():
@@ -378,8 +368,8 @@ def test_backend_slots_are_blocked_with_a_reason_naming_the_backend():
         assert result.details["slot"] == slot
         assert result.details["required_backend"] == requirement["required_backend"]
         assert result.details["required_protocol"] == protocol
-        assert result.details["availability"] == "not_implemented_in_this_release"
-        assert result.details["milestone"] == "P2C-06"
+        assert result.details["availability"] == "optional_backend"
+        assert result.details["milestone"] == "0.5.0"
         assert result.provenance["backend_requirement"] == dict(requirement)
 
 
@@ -424,17 +414,23 @@ def test_a_backend_slot_reports_absent_geometry_before_it_names_a_backend():
     assert only_dependency in report.warnings
 
 
-def test_audit_construction_refuses_a_caller_supplied_backend_slot():
-    with pytest.raises(ValueError) as excinfo:
-        audit_construction(
-            _full_evidence(),
-            _spec(),
-            axis=AXIS,
-            diagnostics=(_UnimplementedEmbeddingSlot(),),
-        )
-
-    assert "no implementation in this release" in str(excinfo.value)
-    assert "P2C-06" in str(excinfo.value)
+def test_audit_construction_accepts_a_caller_supplied_backend_slot():
+    """A backend slot is a real diagnostic: supplying one configures the slot."""
+    report = audit_construction(
+        _full_evidence(),
+        _spec(),
+        axis=AXIS,
+        diagnostics=(GrammarConsistency(backend=_FakeGrammar()),),
+    )
+    result = report.components["b_gram"]
+    assert result.status is DiagnosticStatus.READY
+    assert isinstance(result.value, float)
+    assert report.provenance["diagnostics"]["b_gram"] == "GrammarConsistency"
+    # The other two backend slots were not configured and stay blocked by name.
+    for slot in ("b_equiv", "b_diff_dep"):
+        assert report.components[slot].status is DiagnosticStatus.BLOCKED
+        assert report.components[slot].reason_code.endswith("_backend_unavailable")
+    assert BACKEND_BLOCKED_WARNING.format(slots="b_equiv, b_diff_dep") in report.warnings
 
 
 def test_audit_construction_refuses_a_non_slot_or_duplicated_diagnostic():
@@ -1571,4 +1567,424 @@ def test_blocked_slots_do_not_advertise_an_install_that_does_not_exist():
         if extra is not None:
             name = extra.partition("[")[2].rstrip("]")
             assert name in declared, f"{slot} advertises undeclared extra {extra!r}"
-        assert requirement["availability"] == "not_implemented_in_this_release"
+        assert requirement["availability"] == "optional_backend"
+        # The blocked reason names a reference backend that really exists.
+        from fairlms.diagnostics import construction as construction_module
+        from fairlms.diagnostics import backends as backends_module
+
+        reason = construction_module._BACKEND_BLOCKED_REASONS[slot]
+        match = re.search(r"fairlms\.diagnostics\.backends\.(\w+)\(\)", reason)
+        assert match is not None, reason
+        assert hasattr(backends_module, match.group(1)), match.group(1)
+    for extra in ("grammar", "parse", "nlp"):
+        assert extra in declared, f"pyproject.toml does not declare the {extra!r} extra"
+
+
+# --------------------------------------------------------------------------
+# Backend-dependent slots with a supplied backend
+# --------------------------------------------------------------------------
+
+
+class _FakeEmbedding:
+    """Deterministic bag-of-words vectors over the vocabulary of one call."""
+
+    revision = "fake-bag-of-words@1"
+
+    def encode(self, texts):
+        vocab = sorted({word for text in texts for word in text.split()})
+        return [[float(text.split().count(word)) for word in vocab] for text in texts]
+
+
+class _FakeGrammar:
+    """Counts the literal token ERR as a grammatical error."""
+
+    revision = "fake-err-token-counter@1"
+
+    def count_errors(self, texts):
+        return [text.split().count("ERR") for text in texts]
+
+
+class _FakeParser:
+    """Depth grows with length: whitespace tokens // 2 + 1."""
+
+    revision = "fake-halving-parser@1"
+    depth_definition = "whitespace tokens // 2 + 1"
+
+    def depths(self, texts):
+        return [len(text.split()) // 2 + 1 for text in texts]
+
+
+_BACKEND_PAIRS = (
+    ("p1", "masculine", "he is a nurse"),
+    ("p1", "feminine", "she is a nurse"),
+    ("p2", "masculine", "he is a brilliant engineer ERR"),
+    ("p2", "feminine", "she is an engineer"),
+    ("p3", "masculine", "his desk is tidy"),
+    ("p3", "feminine", "her desk is tidy ERR ERR"),
+)
+_BACKEND_GROUPED = (
+    ("masculine", "one two three four"),
+    ("masculine", "one two"),
+    ("feminine", "a b c d e f"),
+    ("feminine", "a b"),
+)
+
+
+def _backend_paired(rows=_BACKEND_PAIRS):
+    return PairedTexts(
+        axis=AXIS,
+        pair_ids=[row[0] for row in rows],
+        conditions=[row[1] for row in rows],
+        texts=[row[2] for row in rows],
+        condition_roles=["masculine", "feminine"],
+        pairing_basis="pronoun swap",
+        source="synthetic backend fixture",
+    )
+
+
+def _backend_grouped(rows=_BACKEND_GROUPED, declared=("masculine", "feminine")):
+    return GroupedTexts(
+        axis=AXIS,
+        groups=[row[0] for row in rows],
+        texts=[row[1] for row in rows],
+        declared_groups=list(declared),
+        source="synthetic backend fixture",
+    )
+
+
+def _backend_mask():
+    return IdentityMaskConfig(identity_terms=("he", "she", "his", "her"))
+
+
+def _backend_diagnostics():
+    return (
+        SemanticEquivalence(identity_mask=_backend_mask(), backend=_FakeEmbedding()),
+        GrammarConsistency(backend=_FakeGrammar()),
+        DependencyDepthDisparity(backend=_FakeParser()),
+    )
+
+
+def _backend_spec(**overrides):
+    parameters = {
+        "requested_components": ("b_equiv", "b_gram", "b_diff_dep"),
+        "design_stance": "population_proxy",
+    }
+    parameters.update(overrides)
+    return _spec(**parameters)
+
+
+def _independent_cosine(left, right):
+    dot = sum(a * b for a, b in zip(left, right))
+    return dot / math.sqrt(sum(a * a for a in left)) / math.sqrt(sum(b * b for b in right))
+
+
+def test_backend_slots_run_and_match_an_independent_recomputation():
+    report = audit_construction(
+        _evidence(paired=_backend_paired(), grouped=_backend_grouped()),
+        _backend_spec(),
+        axis=AXIS,
+        diagnostics=_backend_diagnostics(),
+    )
+    equiv = report.components["b_equiv"]
+    gram = report.components["b_gram"]
+    dep = report.components["b_diff_dep"]
+    for result in (equiv, gram, dep):
+        assert result.status is DiagnosticStatus.READY
+        assert isinstance(result.value, float)
+        assert result.reason_code is None
+
+    # b_equiv: the same mask, an independent cosine, the paper's 1 - mean.
+    mask = _backend_mask()
+    masked = [" ".join(mask.mask(text)) for _, _, text in _BACKEND_PAIRS]
+    vocab = sorted({word for text in masked for word in text.split()})
+
+    def vector(text):
+        return [text.split().count(word) for word in vocab]
+
+    similarities = [
+        _independent_cosine(vector(masked[index]), vector(masked[index + 1]))
+        for index in range(0, len(masked), 2)
+    ]
+    assert equiv.value == pytest.approx(1.0 - sum(similarities) / 3)
+    assert equiv.details["mean_cosine_similarity"] == pytest.approx(sum(similarities) / 3)
+    assert equiv.details["embedding_width"] == len(vocab)
+    assert equiv.details["identity_term_count"] == 4
+
+    # b_gram: |0 - 0|, |1 - 0|, |0 - 2| on the unmasked sides.
+    assert gram.value == pytest.approx(1.0)
+    assert gram.details["pairs_with_difference"] == 2
+    assert gram.details["maximum_absolute_error_difference"] == 2
+    assert dict(gram.details["mean_error_count_by_condition"]) == pytest.approx(
+        {"masculine": 1 / 3, "feminine": 2 / 3}
+    )
+
+    # b_diff_dep: masculine depths [3, 2], feminine [4, 2]; gap over pooled 11 / 4.
+    assert dep.value == pytest.approx(0.5 / 2.75)
+    assert dict(dep.details["group_mean_depths"]) == {"masculine": 2.5, "feminine": 3.0}
+    assert dep.details["pooled_mean_depth"] == pytest.approx(2.75)
+    assert dep.details["denominator_rule"] == "sample_weighted_pooled_mean"
+
+    # A ready backend slot raises no backend warning, and provenance names the backend.
+    assert not any(warning.startswith("Component(s)") for warning in report.warnings)
+    for result, protocol in (
+        (equiv, "EmbeddingBackend"),
+        (gram, "GrammarCheckerBackend"),
+        (dep, "DependencyParserBackend"),
+    ):
+        assert result.provenance["backend"]["protocol"] == protocol
+        assert result.provenance["backend"]["revision"] == result.details["backend_revision"]
+        assert result.provenance["backend_requirement"]["required_protocol"] == protocol
+        assert result.details["paper_alignment"] == "paper_exact_given_backend"
+    assert dep.provenance["backend"]["depth_definition"] == _FakeParser.depth_definition
+    assert set(report.provenance["diagnostics"]) == set(CONSTRUCTION_SLOTS)
+    json.dumps(report.to_dict())
+
+
+def test_a_supplied_backend_must_satisfy_the_slot_protocol():
+    class NoRevision:
+        def encode(self, texts):
+            return []
+
+    class NoMethod:
+        revision = "x"
+
+    with pytest.raises(TypeError, match="EmbeddingBackend"):
+        SemanticEquivalence(backend=NoRevision())
+    with pytest.raises(TypeError, match="GrammarCheckerBackend"):
+        GrammarConsistency(backend=NoMethod())
+    with pytest.raises(TypeError, match="DependencyParserBackend"):
+        DependencyDepthDisparity(backend=object())
+
+
+def test_b_equiv_with_a_backend_still_blocks_without_an_identity_mask():
+    report = audit_construction(
+        _evidence(paired=_backend_paired()),
+        _backend_spec(requested_components=("b_equiv",)),
+        axis=AXIS,
+        diagnostics=(SemanticEquivalence(backend=_FakeEmbedding()),),
+    )
+    result = report.components["b_equiv"]
+    assert result.status is DiagnosticStatus.BLOCKED
+    assert result.reason_code == "missing_identity_mask"
+    assert result.value is None
+    # Blocked for a mask, not for a backend: no backend warning is raised.
+    assert not any(warning.startswith("Component(s)") for warning in report.warnings)
+
+
+def test_backend_exceptions_become_failed_results_instead_of_crashes():
+    class Raising:
+        revision = "raising@1"
+
+        def count_errors(self, texts):
+            raise RuntimeError("server down")
+
+    result = GrammarConsistency(backend=Raising()).compute(_backend_paired(), _backend_spec())
+    assert result.status is DiagnosticStatus.FAILED
+    assert result.reason_code == "backend_call_failed"
+    assert "RuntimeError" in result.reason
+    assert result.value is None
+
+
+@pytest.mark.parametrize(
+    "output, fragment",
+    [
+        ([1, 2], "2 values for 6 texts"),
+        ([1, -1, 0, 0, 0, 0], "non-negative integer"),
+        ([1.5, 0, 0, 0, 0, 0], "non-negative integer"),
+        ([True, 0, 0, 0, 0, 0], "non-negative integer"),
+        ("abcdef", "instead of a sequence"),
+    ],
+)
+def test_invalid_count_output_is_reported_not_trusted(output, fragment):
+    class Bad:
+        revision = "bad@1"
+
+        def count_errors(self, texts):
+            return output
+
+    result = GrammarConsistency(backend=Bad()).compute(_backend_paired(), _backend_spec())
+    assert result.status is DiagnosticStatus.FAILED
+    assert result.reason_code == "backend_output_invalid"
+    assert fragment in result.reason
+    assert result.value is None
+
+
+@pytest.mark.parametrize(
+    "vectors, fragment",
+    [
+        ([[1.0, 0.0]] * 5, "5 vectors for 6 texts"),
+        ([[1.0, 0.0]] * 5 + [[1.0]], "different widths"),
+        ([[1.0, float("nan")]] + [[1.0, 0.0]] * 5, "non-finite"),
+        ([[]] * 6, "is empty"),
+        ([["a", "b"]] * 6, "non-numeric"),
+    ],
+)
+def test_invalid_vector_output_is_reported_not_trusted(vectors, fragment):
+    class Bad:
+        revision = "bad@1"
+
+        def encode(self, texts):
+            return vectors
+
+    result = SemanticEquivalence(identity_mask=_backend_mask(), backend=Bad()).compute(
+        _backend_paired(), _backend_spec()
+    )
+    assert result.status is DiagnosticStatus.FAILED
+    assert result.reason_code == "backend_output_invalid"
+    assert fragment in result.reason
+
+
+def test_b_equiv_zero_norm_vectors_are_a_failure_not_a_similarity():
+    class Zero:
+        revision = "zero@1"
+
+        def encode(self, texts):
+            return [[0.0, 0.0] for _ in texts]
+
+    result = SemanticEquivalence(identity_mask=_backend_mask(), backend=Zero()).compute(
+        _backend_paired(), _backend_spec()
+    )
+    assert result.status is DiagnosticStatus.FAILED
+    assert result.reason_code == "zero_norm_embedding"
+    assert result.details["zero_norm_pair_count"] == 3
+    assert result.value is None
+
+
+def test_b_diff_dep_blocks_an_empty_declared_group_and_fails_a_zero_denominator():
+    empty_group = _backend_grouped(declared=("masculine", "feminine", "neutral"))
+    blocked = DependencyDepthDisparity(backend=_FakeParser()).compute(empty_group, _backend_spec())
+    assert blocked.status is DiagnosticStatus.BLOCKED
+    assert blocked.reason_code == "empty_declared_group"
+
+    class Flat:
+        revision = "flat@1"
+
+        def depths(self, texts):
+            return [0 for _ in texts]
+
+    failed = DependencyDepthDisparity(backend=Flat()).compute(_backend_grouped(), _backend_spec())
+    assert failed.status is DiagnosticStatus.FAILED
+    assert failed.reason_code == "zero_depth_denominator"
+    assert failed.value is None
+
+
+def test_backend_slots_follow_the_shared_precedence_before_the_backend():
+    not_requested = audit_construction(
+        _evidence(paired=_backend_paired(), grouped=_backend_grouped()),
+        _spec(requested_components=("b_min",)),
+        axis=AXIS,
+        diagnostics=_backend_diagnostics(),
+    )
+    for slot in BACKEND_CONSTRUCTION_SLOTS:
+        assert not_requested.components[slot].reason_code == "component_not_requested"
+
+    view_absent = audit_construction(
+        _evidence(grouped=_backend_grouped()),
+        _backend_spec(),
+        axis=AXIS,
+        diagnostics=_backend_diagnostics(),
+    )
+    for slot in ("b_equiv", "b_gram"):
+        assert view_absent.components[slot].status is DiagnosticStatus.NOT_APPLICABLE
+        assert view_absent.components[slot].reason_code == "evidence_view_not_supplied"
+    assert view_absent.components["b_diff_dep"].status is DiagnosticStatus.READY
+
+
+def test_direct_compute_and_audit_construction_agree_for_a_backend_slot():
+    direct = GrammarConsistency(backend=_FakeGrammar()).compute(
+        _backend_paired(), _backend_spec()
+    )
+    via_audit = audit_construction(
+        _evidence(paired=_backend_paired()),
+        _backend_spec(),
+        axis=AXIS,
+        diagnostics=(GrammarConsistency(backend=_FakeGrammar()),),
+    ).components["b_gram"]
+    assert direct.to_dict() == via_audit.to_dict()
+
+
+def test_golden_backend_slots_fixture_replays_with_the_declared_fake_backends():
+    path = (
+        Path(__file__).parent
+        / "data"
+        / "golden"
+        / "diagnostics"
+        / "b_constr"
+        / "synthetic_gender_backend_slots_v1.json"
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "/Users/" not in text
+    fixture = json.loads(text)
+    assert fixture["oracle"]["replayable_in_ci"] is True
+    axis = fixture["axis"]
+
+    paired_rows = fixture["evidence"]["paired_texts"]
+    paired = PairedTexts(
+        axis=axis,
+        pair_ids=[row[0] for row in paired_rows["rows"]],
+        conditions=[row[1] for row in paired_rows["rows"]],
+        texts=[row[2] for row in paired_rows["rows"]],
+        condition_roles=paired_rows["condition_roles"],
+        pairing_basis=paired_rows["pairing_basis"],
+        source=paired_rows["source"],
+    )
+    grouped_rows = fixture["evidence"]["grouped_texts"]
+    grouped = GroupedTexts(
+        axis=axis,
+        groups=[row[0] for row in grouped_rows["rows"]],
+        texts=[row[1] for row in grouped_rows["rows"]],
+        declared_groups=grouped_rows["declared_groups"],
+        source=grouped_rows["source"],
+    )
+    evidence = DatasetEvidence(
+        target_name=fixture["dataset"],
+        paired_texts={axis: paired},
+        grouped_texts={axis: grouped},
+    )
+    spec = DatasetAuditSpec(
+        target_name=fixture["dataset"],
+        target_kind="benchmark_dataset",
+        task_family="free_text",
+        design_stance=fixture["design_stance"],
+        references={},
+        requested_components=tuple(fixture["parameters"]["requested_components"]),
+    )
+    mask = IdentityMaskConfig(identity_terms=tuple(fixture["parameters"]["identity_terms"]))
+    declared = fixture["parameters"]["backends"]
+    fakes = {
+        _FakeEmbedding.revision: _FakeEmbedding,
+        _FakeGrammar.revision: _FakeGrammar,
+        _FakeParser.revision: _FakeParser,
+    }
+    report = audit_construction(
+        evidence,
+        spec,
+        axis=axis,
+        diagnostics=(
+            SemanticEquivalence(identity_mask=mask, backend=fakes[declared["b_equiv"]]()),
+            GrammarConsistency(backend=fakes[declared["b_gram"]]()),
+            DependencyDepthDisparity(backend=fakes[declared["b_diff_dep"]]()),
+        ),
+    )
+
+    assert report.status.value == fixture["expected"]["report_status"]
+    assert len(report.warnings) == fixture["expected"]["warning_count"]
+    for slot, expected in fixture["expected"]["components"].items():
+        result = report.components[slot]
+        assert result.status.value == expected["status"], slot
+        assert result.reason_code == expected["reason_code"], slot
+        if expected["value"] is None:
+            assert result.value is None, slot
+        else:
+            assert result.value == pytest.approx(expected["value"], rel=1e-12), slot
+        for key, value in expected["details"].items():
+            actual = result.details[key]
+            if isinstance(value, float):
+                assert actual == pytest.approx(value, rel=1e-12), (slot, key)
+            elif isinstance(value, dict):
+                assert dict(actual) == pytest.approx(value, rel=1e-12), (slot, key)
+            elif isinstance(value, list):
+                assert list(actual) == value, (slot, key)
+            else:
+                assert actual == value, (slot, key)
+        assert result.provenance["backend"]["revision"] == declared[slot]

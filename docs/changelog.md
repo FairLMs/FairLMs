@@ -11,6 +11,17 @@ undefined scores, run provenance, revision controls, real offline model tests,
 source archive validation, and corpus checksums/attribution. No upstream release
 or paper update is implied by this development version.
 
+**Construction vector complete.** `b_equiv`, `b_gram` and `b_diff_dep` are
+implemented as `SemanticEquivalence`, `GrammarConsistency` and
+`DependencyDepthDisparity`, each taking an optional `backend=` that satisfies
+`EmbeddingBackend`, `GrammarCheckerBackend` or `DependencyParserBackend`.
+`fairlms.diagnostics.backends` ships `HuggingFaceEmbeddingBackend` (core
+dependencies), `LanguageToolGrammarBackend` (`fairlms[grammar]`) and
+`SpacyDependencyBackend` (`fairlms[parse]`); `fairlms[nlp]` installs both extras.
+The backend revision is recorded in component provenance. Without a backend the
+three slots block by name exactly as before, so existing reports are unchanged;
+the registry now holds 14 diagnostics.
+
 **Bundled corpora consolidated.** 84 files under `fairlms/definition/` that were
 byte-identical to a copy under `fairlms/data/` were deleted, removing
 359,582,594 bytes. `fairlms/data/` is now the single source, and

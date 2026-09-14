@@ -172,14 +172,19 @@ def diagnostics_page() -> str:
         CONSTRUCTION_SLOTS,
     )
 
+    reference_backends = {
+        "b_equiv": "HuggingFaceEmbeddingBackend",
+        "b_gram": "LanguageToolGrammarBackend",
+        "b_diff_dep": "SpacyDependencyBackend",
+    }
     backend_rows = [
-        "| `{slot}` | {backend} | `{view}` | `{code}` | `{availability}` | {milestone} |".format(
+        "| `{slot}` | `{cls}` | `{protocol}` | `{reference}` | `{view}` | `{code}` |".format(
             slot=slot,
-            backend=f"`{CONSTRUCTION_BACKEND_REQUIREMENTS[slot]['required_protocol']}`",
+            cls=DIAGNOSTIC_REGISTRY[slot].__name__,
+            protocol=CONSTRUCTION_BACKEND_REQUIREMENTS[slot]["required_protocol"],
+            reference=reference_backends[slot],
             view=CONSTRUCTION_BACKEND_REQUIREMENTS[slot]["required_view"],
             code=CONSTRUCTION_BACKEND_REQUIREMENTS[slot]["reason_code"],
-            availability=CONSTRUCTION_BACKEND_REQUIREMENTS[slot]["availability"],
-            milestone=CONSTRUCTION_BACKEND_REQUIREMENTS[slot]["milestone"],
         )
         for slot in CONSTRUCTION_SLOTS
         if slot in BACKEND_CONSTRUCTION_SLOTS
@@ -201,9 +206,9 @@ def diagnostics_page() -> str:
         "`blocked` for their own missing configuration -- `b_min` without an "
         "identity mask, `b_opt` without an option-role contrast, `b_frame` "
         "without a frame predicate, `b_leak` on raw text without an "
-        "extraction configuration. That is the designed answer, not a "
-        "defect: each of those settings is part of the estimand and is never "
-        "inferred.\n\n"
+        "extraction configuration, and `b_equiv`, `b_gram`, `b_diff_dep` "
+        "without a `backend`. That is the designed answer, not a defect: each "
+        "of those settings is part of the estimand and is never inferred.\n\n"
         "| Component | Class | Evidence | Description |\n|---|---|---|---|\n"
         + "\n".join(rows)
         + "\n\n"
@@ -214,23 +219,25 @@ def diagnostics_page() -> str:
         + ", never as an aggregate score. `construction_vector(report)` "
         "returns them in that order, since a report alphabetizes its "
         "components.\n\n"
-        + f"The {len(backend_rows)} slots below depend on an optional backend "
-        "that this release does not ship. They have no registered class by "
-        "design: `audit_construction` and `audit_dataset` synthesize a result "
-        "for each of them instead of registering a stub. The backend is "
-        "checked **last**, after the precedence every component shares, so a "
-        "backend slot is `blocked` with the reason code below only when it "
-        "was requested *and* its required evidence view is present for the "
-        "audited axis. Otherwise it reports the same non-ready outcome any "
-        "other component would: `not_applicable` / `component_not_requested`, "
-        "`not_applicable` / `evidence_view_not_supplied`, `not_applicable` / "
-        "`target_kind_not_supported`, or whatever a caller override declares. "
+        + f"The {len(backend_rows)} slots below read a quantity that needs an "
+        "optional backend: a sentence embedding, a grammatical-error count or a "
+        "dependency-tree depth. Each is a registered class that takes `backend=`; "
+        "reference implementations live in `fairlms.diagnostics.backends`. The "
+        "embedding backend runs on the core dependencies, while the grammar and "
+        "parser backends need the `grammar` and `parse` extras "
+        "(`pip install \"fairlms[nlp]\"` installs both). Without a backend the slot "
+        "is `blocked` with the reason code below, but only after the precedence "
+        "every component shares: when it was not requested, the target kind is "
+        "unsupported or its required evidence view is absent for the audited "
+        "axis, it is `not_applicable` for that ordinary reason "
+        "(`component_not_requested`, `target_kind_not_supported`, "
+        "`evidence_view_not_supplied`), or whatever a caller override declares. "
         "Status alone therefore does not identify a backend slot -- "
         "`BACKEND_CONSTRUCTION_SLOTS` and `CONSTRUCTION_BACKEND_REQUIREMENTS` "
         "do. A missing backend blocks only its own slot and never the rest of "
         "the vector.\n\n"
-        "| Slot | Required backend | Required view | Reason code | "
-        "Availability | Milestone |\n"
+        "| Slot | Class | Protocol | Reference backend | Required view | "
+        "Reason code without a backend |\n"
         "|---|---|---|---|---|---|\n" + "\n".join(backend_rows) + "\n"
     )
 

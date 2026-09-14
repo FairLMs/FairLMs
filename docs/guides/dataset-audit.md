@@ -144,20 +144,50 @@ score:
 | `b_opt` | signed option-length difference between two declared option roles |
 | `b_temp` | template-count imbalance across declared groups, with its coverage ratio |
 
-`b_equiv`, `b_gram` and `b_diff_dep` need an optional backend that this release
-does not ship. Nothing is registered for them, so `list_diagnostics()` never
-advertises a component that cannot run; `audit_construction` and `audit_dataset`
-synthesize the slot instead. The backend is checked last, so such a slot is
-`blocked` with a reason code naming the missing backend only when it was
-requested *and* the evidence view it needs is present for the audited axis --
-`paired_texts` for `b_equiv` and `b_gram`, `grouped_texts` for `b_diff_dep`.
-Otherwise it is `not_applicable` for the ordinary reason: `component_not_requested`,
-`target_kind_not_supported`, or `evidence_view_not_supplied`. The snippet below
-supplies only `grouped_texts`, so it prints `b_equiv` and `b_gram` as
-`not_applicable` and `b_diff_dep` as `blocked`. To find the slots that need a
-backend, read `BACKEND_CONSTRUCTION_SLOTS` and
-`CONSTRUCTION_BACKEND_REQUIREMENTS` rather than filtering on status. A missing
-backend blocks only its own slot; every other slot is unaffected.
+`b_equiv`, `b_gram` and `b_diff_dep` read a quantity that needs an optional
+backend: a sentence embedding, a grammatical-error count and a dependency-tree
+depth. Each is a registered class (`SemanticEquivalence`, `GrammarConsistency`,
+`DependencyDepthDisparity`) that takes `backend=`, and
+`fairlms.diagnostics.backends` ships one reference implementation per protocol:
+
+```python
+from fairlms.diagnostics import (
+    DependencyDepthDisparity, GrammarConsistency, IdentityMaskConfig, SemanticEquivalence,
+)
+from fairlms.diagnostics.backends import (
+    HuggingFaceEmbeddingBackend,   # any Hugging Face encoder; core dependencies only
+    LanguageToolGrammarBackend,    # pip install "fairlms[grammar]" (needs Java)
+    SpacyDependencyBackend,        # pip install "fairlms[parse]"; python -m spacy download en_core_web_sm
+)
+
+diagnostics = (
+    SemanticEquivalence(
+        identity_mask=IdentityMaskConfig(identity_terms=("he", "she", "his", "her")),
+        backend=HuggingFaceEmbeddingBackend(),   # sentence-transformers/all-MiniLM-L6-v2
+    ),
+    GrammarConsistency(backend=LanguageToolGrammarBackend()),
+    DependencyDepthDisparity(backend=SpacyDependencyBackend()),
+)
+report = audit_construction(evidence, spec, axis="gender", diagnostics=diagnostics)
+```
+
+The backend's `revision` (model, version, pooling rule) is written into the
+component's provenance, because a similarity or a depth is comparable only
+against values from the same backend. Any object with a `revision` string and
+the protocol's method (`encode`, `count_errors` or `depths`) is accepted, so a
+different embedding model or parser plugs in without subclassing.
+
+The backend is checked last, so a slot without one is `blocked` with a reason
+code naming the missing backend only when it was requested *and* the evidence
+view it needs is present for the audited axis -- `paired_texts` for `b_equiv`
+and `b_gram`, `grouped_texts` for `b_diff_dep`. Otherwise it is `not_applicable`
+for the ordinary reason: `component_not_requested`, `target_kind_not_supported`,
+or `evidence_view_not_supplied`. The snippet below supplies only `grouped_texts`
+and no backends, so it prints `b_equiv` and `b_gram` as `not_applicable` and
+`b_diff_dep` as `blocked`. To find the slots that need a backend, read
+`BACKEND_CONSTRUCTION_SLOTS` and `CONSTRUCTION_BACKEND_REQUIREMENTS` rather than
+filtering on status. A missing backend blocks only its own slot; every other
+slot is unaffected.
 
 Two rules are worth stating outright. Option roles are always supplied by name:
 `stereotype` and `anti_stereotype` are never inferred from the order the options
