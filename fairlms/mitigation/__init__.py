@@ -32,7 +32,7 @@ Component                               Category   Access
 ``self_debiasing``                      intra      gray_box
 ``score_calibration``                   post       black_box
 ``group_aware_thresholding``            post       black_box
-``fairness_aware_reranking``            post       black_box
+``output_reranking``                    post       black_box
 ======================================  =========  ============
 
 **Out of scope, deliberately.** Named in the paper as extension points and
@@ -103,8 +103,8 @@ from .intraprocessing import (
     SubspaceProjection,
 )
 from .postprocessing import (
-    FairnessAwareReranking,
     GroupAwareThresholding,
+    OutputReranking,
     ScoreCalibration,
 )
 from .preprocessing import (
@@ -170,8 +170,8 @@ __all__ = [
     "SelfDebiasing",
     "SubspaceProjection",
     # Post-processing
-    "FairnessAwareReranking",
     "GroupAwareThresholding",
+    "OutputReranking",
     "ScoreCalibration",
     # Before/after harness
     "ComparisonReport",

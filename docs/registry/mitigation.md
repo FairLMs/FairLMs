@@ -44,8 +44,8 @@ Decision rules fitted on outputs. Serializable, and applied without the model th
 
 | Component | Class | Access | Architectures | Requires | Accepts |
 |---|---|---|---|---|---|
-| `fairness_aware_reranking` | `FairnessAwareReranking` | `black_box` | `decoder_only`, `encoder_decoder` | - | `CandidateSets` |
 | `group_aware_thresholding` | `GroupAwareThresholding` | `black_box` | `decoder_only`, `encoder_decoder`, `encoder_only` | - | `LabeledScoredGroups` |
+| `output_reranking` | `OutputReranking` | `black_box` | `decoder_only`, `encoder_decoder` | - | `CandidateSets` |
 | `score_calibration` | `ScoreCalibration` | `black_box` | `decoder_only`, `encoder_decoder`, `encoder_only` | - | `LabeledScoredGroups` |
 
 ## Not provided

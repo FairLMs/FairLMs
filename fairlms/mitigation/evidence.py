@@ -35,12 +35,20 @@ __all__ = [
     "CandidateSets",
     "CorpusWithBenignPool",
     "CorpusWithLexicon",
+    "GENERATOR_RANK",
     "GroupLabeledRecords",
     "InfluenceScoredCorpus",
     "PromptSpec",
     "SwapLexicon",
     "TextRecords",
 ]
+
+
+#: Reserved ``CandidateSets.quality_name``, recorded by
+#: :class:`~fairlms.mitigation.OutputReranking` when the caller declares
+#: no ``q`` and the generator's own ordering stands in for it. A caller cannot
+#: claim the name, or a fitted rule could not tell the two apart.
+GENERATOR_RANK = "generator_rank"
 
 
 def _check_texts(value: Any, field_name: str) -> Tuple[str, ...]:
@@ -472,17 +480,28 @@ class AttributeLabeledVectors:
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True, kw_only=True)
 class CandidateSets:
-    """Per-query candidate generations plus an injected bias scorer.
+    """Per-query candidate generations plus the injected scorers a reranker needs.
 
-    The scorer is **declared, never chosen** by the library: reranking reorders
-    by whatever notion of bias the caller is willing to defend, and burying a
-    default scorer here would make that choice invisible.
+    Both scorers are **declared, never chosen** by the library: reranking
+    reorders by whatever notions of bias and quality the caller is willing to
+    defend, and burying defaults here would make those choices invisible.
+
+    ``scorer`` is the bias term ``f`` of
+    :class:`~fairlms.mitigation.OutputReranking`, which maximizes
+    ``lambda * q + (1 - lambda) * f`` and so prefers *higher* ``f``: a caller
+    who wants bias penalized declares ``f`` oriented that way, for instance as a
+    negated bias score. ``quality`` is the ``q`` term, in whatever units the
+    caller declares; when it is omitted, the reranker reads ``q`` off the
+    generator's own ordering and records that as
+    ``quality_name='generator_rank'``.
     """
 
     queries: Sequence[str]
     candidates: Sequence[Sequence[str]]
     scorer: Callable[[str, str], float]
     scorer_name: str
+    quality: Optional[Callable[[str, str], float]] = None
+    quality_name: Optional[str] = None
 
     def __post_init__(self) -> None:
         queries = _check_texts(self.queries, "queries")
@@ -513,6 +532,28 @@ class CandidateSets:
             "scorer_name",
             require_nonempty_string(self.scorer_name, "scorer_name"),
         )
+        if self.quality is not None:
+            if not callable(self.quality):
+                raise TypeError(
+                    f"quality must be callable (query, candidate) -> float; got "
+                    f"{type(self.quality).__name__}."
+                )
+            # A declared quality scorer has to be nameable, so a fitted rule
+            # records which `q` produced it.
+            quality_name = require_nonempty_string(self.quality_name, "quality_name")
+            if quality_name == GENERATOR_RANK:
+                raise ValueError(
+                    f"quality_name {GENERATOR_RANK!r} is reserved for the "
+                    "generator's own ordering; name the declared quality scorer "
+                    "something else."
+                )
+            object.__setattr__(self, "quality_name", quality_name)
+        elif self.quality_name is not None:
+            raise ValueError(
+                "quality_name was given without quality; pass the callable "
+                "itself, or drop the name to rank by the generator's own "
+                "ordering."
+            )
         object.__setattr__(self, "queries", queries)
         object.__setattr__(self, "candidates", tuple(cleaned))
 
@@ -525,4 +566,5 @@ class CandidateSets:
             "queries": list(self.queries),
             "candidates": [list(row) for row in self.candidates],
             "scorer_name": self.scorer_name,
+            "quality_name": self.quality_name,
         }

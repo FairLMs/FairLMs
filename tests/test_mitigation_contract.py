@@ -45,7 +45,7 @@ MANUSCRIPT_NAMES = {
     "self_debiasing",
     "score_calibration",
     "group_aware_thresholding",
-    "fairness_aware_reranking",
+    "output_reranking",
 }
 
 #: Table 1's footer lists exactly these as architecture-agnostic.

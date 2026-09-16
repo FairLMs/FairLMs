@@ -26,8 +26,8 @@ from .intraprocessing import (
     SubspaceProjection,
 )
 from .postprocessing import (
-    FairnessAwareReranking,
     GroupAwareThresholding,
+    OutputReranking,
     ScoreCalibration,
 )
 from .preprocessing import (
@@ -55,7 +55,7 @@ _COMPONENTS = (
     # post (3)
     ScoreCalibration,
     GroupAwareThresholding,
-    FairnessAwareReranking,
+    OutputReranking,
 )
 
 MITIGATOR_REGISTRY: Mapping[str, Type[Mitigator]] = MappingProxyType(

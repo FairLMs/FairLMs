@@ -11,14 +11,14 @@ One mitigator per module, with the per-group guards they share in
 ==============================  ==================================
 ``score_calibration``           :mod:`~.score_calibration`
 ``group_aware_thresholding``    :mod:`~.group_aware_thresholding`
-``fairness_aware_reranking``    :mod:`~.fairness_aware_reranking`
+``output_reranking``            :mod:`~.output_reranking`
 ==============================  ==================================
 """
 
 from __future__ import annotations
 
 from ._shared import _ALL_ARCHITECTURES, _require_both_classes, _require_rows
-from .fairness_aware_reranking import FairnessAwareReranking, _rerank_one
+from .output_reranking import OutputReranking, _rerank_one
 from .group_aware_thresholding import (
     GroupAwareThresholding,
     _candidate_thresholds,
@@ -33,7 +33,7 @@ from .score_calibration import (
 )
 
 __all__ = [
-    "FairnessAwareReranking",
     "GroupAwareThresholding",
+    "OutputReranking",
     "ScoreCalibration",
 ]

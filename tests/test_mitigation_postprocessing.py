@@ -7,7 +7,7 @@ import pytest
 from fairlms.diagnostics import LabeledScoredGroups, ScoredGroups
 from fairlms.mitigation import (
     CandidateSets,
-    FairnessAwareReranking,
+    OutputReranking,
     GroupAwareThresholding,
     ScoreCalibration,
 )
@@ -202,31 +202,124 @@ class TestGroupAwareThresholding:
         assert result.to_dict()["result"]["criterion"] == "equal_opportunity"
 
 
-class TestFairnessAwareReranking:
+class TestOutputReranking:
     def _sets(self, scorer=None):
+        # `f` is oriented as the objective requires: higher is better, so a
+        # gendered continuation scores below a neutral one.
         return CandidateSets(
             queries=["the nurse said"],
             candidates=[["she smiled", "they smiled", "he smiled"]],
-            scorer=scorer or (lambda q, c: 1.0 if c.startswith(("she", "he")) else 0.0),
+            scorer=scorer
+            or (lambda q, c: -1.0 if c.startswith(("she", "he")) else 0.0),
             scorer_name="unit-test-gendered",
         )
 
-    def test_weight_zero_reproduces_the_original_order_exactly(self):
-        # The invariant that makes the weight interpretable.
-        result = FairnessAwareReranking(weight=0.0).apply(None, self._sets())
+    def _scored_sets(self, quality, bias):
+        return CandidateSets(
+            queries=["the nurse said"],
+            candidates=[["she smiled", "they smiled", "he smiled"]],
+            scorer=bias,
+            scorer_name="unit-test-bias",
+            quality=quality,
+            quality_name="unit-test-quality",
+        )
+
+    def test_lambda_one_ranks_purely_by_the_declared_quality(self):
+        result = OutputReranking(lambda_=1.0).apply(
+            None,
+            self._scored_sets(
+                quality=lambda q, c: {"she smiled": 0.1, "they smiled": 0.9}.get(
+                    c, 0.5
+                ),
+                # f alone would put every candidate level; only q can order them.
+                bias=lambda q, c: 1.0,
+            ),
+        )
+        assert result.result["rankings"][0] == [
+            "they smiled",
+            "he smiled",
+            "she smiled",
+        ]
+
+    def test_the_objective_trades_quality_against_bias(self):
+        # q prefers "she smiled" by 0.5; f puts it 1.0 below the others. The
+        # objective is lambda * q + (1 - lambda) * f, so at lambda=0.6
+        # "she smiled" scores 0.6 - 0.4 = 0.2 against 0.3 for "they smiled",
+        # and at lambda=0.7 it scores 0.7 - 0.3 = 0.4 against 0.35.
+        sets = self._scored_sets(
+            quality=lambda q, c: 1.0 if c == "she smiled" else 0.5,
+            bias=lambda q, c: -1.0 if c == "she smiled" else 0.0,
+        )
+
+        def _top(lambda_):
+            outcome = OutputReranking(lambda_=lambda_).apply(None, sets)
+            return outcome.result["rankings"][0][0]
+
+        assert _top(0.6) == "they smiled"
+        assert _top(0.7) == "she smiled"
+
+    def test_the_objective_is_recorded_on_the_fitted_rule(self):
+        rule = OutputReranking(lambda_=0.25).apply(None, self._sets()).result
+        assert rule["objective"] == "argmax lambda * q(y) + (1 - lambda) * f(y)"
+        assert rule["lambda"] == 0.25
+
+    def test_the_quality_scorer_is_recorded_in_provenance(self):
+        result = OutputReranking().apply(
+            None, self._scored_sets(quality=lambda q, c: 0.0, bias=lambda q, c: 0.0)
+        )
+        assert result.provenance["quality_name"] == "unit-test-quality"
+        assert result.result["quality_name"] == "unit-test-quality"
+
+    def test_an_absent_quality_scorer_is_recorded_as_the_generator_ordering(self):
+        result = OutputReranking(lambda_=1.0).apply(None, self._sets())
+        assert result.result["quality_name"] == "generator_rank"
+        # Aligned with the returned order, which lambda=1 leaves untouched.
+        assert result.result["quality_scores"][0] == [1.0, 0.5, 0.0]
+
+    def test_a_non_numeric_quality_result_is_refused(self):
+        with pytest.raises(TypeError, match="quality must return a real number"):
+            OutputReranking().apply(
+                None,
+                self._scored_sets(quality=lambda q, c: "good", bias=lambda q, c: 0.0),
+            )
+
+    def test_a_non_finite_quality_result_is_refused(self):
+        with pytest.raises(ValueError, match="quality returned a non-finite"):
+            OutputReranking().apply(
+                None,
+                self._scored_sets(quality=lambda q, c: math.inf, bias=lambda q, c: 0.0),
+            )
+
+    def test_lambda_one_reproduces_the_original_order_exactly(self):
+        # With no declared q, lambda=1 ranks by the generator's own ordering.
+        # The invariant that makes lambda interpretable.
+        result = OutputReranking(lambda_=1.0).apply(None, self._sets())
         assert result.result["rankings"][0] == [
             "she smiled",
             "they smiled",
             "he smiled",
         ]
 
-    def test_weight_one_ranks_purely_by_the_declared_scorer(self):
-        result = FairnessAwareReranking(weight=1.0).apply(None, self._sets())
+    def test_lambda_zero_ranks_purely_by_the_declared_scorer(self):
+        result = OutputReranking(lambda_=0.0).apply(None, self._sets())
         # The only unbiased candidate is promoted to the front.
         assert result.result["rankings"][0][0] == "they smiled"
 
+    def test_a_positively_oriented_bias_scorer_promotes_the_biased_candidate(self):
+        """The documented consequence of adding `f` rather than subtracting it.
+
+        Nothing in the library flips the sign of a declared `f`, so a caller who
+        hands it a raw bias score gets the biased candidates ranked first. This
+        pins that behaviour down rather than leaving it to be discovered.
+        """
+        result = OutputReranking(lambda_=0.0).apply(
+            None,
+            self._sets(scorer=lambda q, c: 1.0 if c.startswith(("she", "he")) else 0.0),
+        )
+        assert result.result["rankings"][0][-1] == "they smiled"
+
     def test_ties_keep_the_generators_original_order(self):
-        result = FairnessAwareReranking(weight=1.0).apply(
+        result = OutputReranking(lambda_=0.0).apply(
             None, self._sets(scorer=lambda q, c: 0.0)
         )
         assert result.result["rankings"][0] == [
@@ -237,42 +330,42 @@ class TestFairnessAwareReranking:
 
     def test_reranking_is_a_permutation_of_the_candidates(self):
         sets = self._sets()
-        result = FairnessAwareReranking().apply(None, sets)
+        result = OutputReranking().apply(None, sets)
         assert sorted(result.result["rankings"][0]) == sorted(sets.candidates[0])
 
     def test_the_scorer_is_recorded_in_provenance(self):
-        result = FairnessAwareReranking().apply(None, self._sets())
+        result = OutputReranking().apply(None, self._sets())
         assert result.provenance["scorer_name"] == "unit-test-gendered"
 
     def test_a_non_numeric_scorer_result_is_refused(self):
         with pytest.raises(TypeError, match="must return a real number"):
-            FairnessAwareReranking().apply(
-                None, self._sets(scorer=lambda q, c: "biased")
-            )
+            OutputReranking().apply(None, self._sets(scorer=lambda q, c: "biased"))
 
     def test_a_non_finite_scorer_result_is_refused(self):
         with pytest.raises(ValueError, match="non-finite"):
-            FairnessAwareReranking().apply(
-                None, self._sets(scorer=lambda q, c: math.inf)
-            )
+            OutputReranking().apply(None, self._sets(scorer=lambda q, c: math.inf))
 
-    def test_a_weight_outside_the_unit_interval_is_refused(self):
+    def test_a_lambda_outside_the_unit_interval_is_refused(self):
         with pytest.raises(ValueError, match=r"must be in \[0, 1\]"):
-            FairnessAwareReranking(weight=2.0).apply(None, self._sets())
+            OutputReranking(lambda_=2.0).apply(None, self._sets())
 
     def test_an_encoder_only_model_is_refused_as_non_generative(self):
         from fairlms.applicability import TASK_PROFILES
 
         with pytest.raises(TypeError, match="decoder_only"):
-            FairnessAwareReranking().apply(TASK_PROFILES["mlm"], self._sets())
+            OutputReranking().apply(TASK_PROFILES["mlm"], self._sets())
 
 
 # --- regression: all three post-processors return a re-appliable rule --------
 
 
 def _bias(query, candidate):
-    """Declared bias scorer: longer candidates are treated as more biased."""
-    return len(str(candidate)) / 10.0
+    """Declared bias scorer: longer candidates are treated as more biased.
+
+    Oriented as the objective requires -- it is added, not subtracted -- so more
+    bias means a lower score.
+    """
+    return -len(str(candidate)) / 10.0
 
 
 def test_every_post_processor_exposes_an_applier():
@@ -282,7 +375,7 @@ def test_every_post_processor_exposes_an_applier():
 
     assert hasattr(MITIGATOR_REGISTRY["score_calibration"], "transform")
     assert hasattr(MITIGATOR_REGISTRY["group_aware_thresholding"], "decide")
-    assert hasattr(MITIGATOR_REGISTRY["fairness_aware_reranking"], "rerank")
+    assert hasattr(MITIGATOR_REGISTRY["output_reranking"], "rerank")
 
 
 def test_a_fitted_reranking_rule_reproduces_its_own_fit():
@@ -292,14 +385,15 @@ def test_a_fitted_reranking_rule_reproduces_its_own_fit():
         scorer=_bias,
         scorer_name="_bias",
     )
-    result = FairnessAwareReranking(weight=0.7).apply(None, evidence)
+    result = OutputReranking(lambda_=0.3).apply(None, evidence)
     rule = result.result
 
-    replayed, biases = FairnessAwareReranking.rerank(
+    replayed, biases, qualities = OutputReranking.rerank(
         rule, "q1", ["aaaa", "bb", "cccccc"], scorer=_bias
     )
     assert replayed == rule["rankings"][0]
     assert biases == rule["bias_scores"][0]
+    assert qualities == rule["quality_scores"][0]
 
 
 def test_a_fitted_rule_applies_to_unseen_candidates():
@@ -309,10 +403,10 @@ def test_a_fitted_rule_applies_to_unseen_candidates():
         scorer=_bias,
         scorer_name="_bias",
     )
-    rule = FairnessAwareReranking(weight=1.0).apply(None, evidence).result
+    rule = OutputReranking(lambda_=0.0).apply(None, evidence).result
 
-    # weight=1.0 orders purely by ascending bias, i.e. by ascending length.
-    order, _ = FairnessAwareReranking.rerank(
+    # lambda=0 orders purely by descending f, i.e. by ascending length.
+    order, _, _ = OutputReranking.rerank(
         rule, "unseen", ["ccccccc", "d", "ee"], scorer=_bias
     )
     assert order == ["d", "ee", "ccccccc"]
@@ -325,10 +419,84 @@ def test_reapplying_a_rule_under_a_different_scorer_is_refused():
         scorer=_bias,
         scorer_name="_bias",
     )
-    rule = FairnessAwareReranking().apply(None, evidence).result
+    rule = OutputReranking().apply(None, evidence).result
 
     def _other(query, candidate):
         return 0.0
 
     with pytest.raises(ValueError, match="different notion of bias"):
-        FairnessAwareReranking.rerank(rule, "q1", ["aaaa", "bb"], scorer=_other)
+        OutputReranking.rerank(rule, "q1", ["aaaa", "bb"], scorer=_other)
+
+
+def _quality(query, candidate):
+    """Declared quality scorer: shorter candidates are treated as better."""
+    return 1.0 - len(str(candidate)) / 10.0
+
+
+def test_a_fitted_rule_carries_its_quality_scorer_through_reapplication():
+    evidence = CandidateSets(
+        queries=["q1"],
+        candidates=[["aaaa", "bb", "cccccc"]],
+        scorer=_bias,
+        scorer_name="_bias",
+        quality=_quality,
+        quality_name="_quality",
+    )
+    rule = OutputReranking(lambda_=0.5).apply(None, evidence).result
+
+    order, _, qualities = OutputReranking.rerank(
+        rule, "q1", ["aaaa", "bb", "cccccc"], scorer=_bias, quality=_quality
+    )
+    assert order == rule["rankings"][0]
+    assert qualities == rule["quality_scores"][0]
+
+    with pytest.raises(ValueError, match="different notion of quality"):
+        OutputReranking.rerank(rule, "q1", ["aaaa", "bb"], scorer=_bias, quality=_bias)
+    with pytest.raises(ValueError, match="none was supplied"):
+        OutputReranking.rerank(rule, "q1", ["aaaa", "bb"], scorer=_bias)
+
+
+def test_supplying_a_quality_scorer_a_rule_was_not_fitted_with_is_refused():
+    evidence = CandidateSets(
+        queries=["q1"], candidates=[["aaaa", "bb"]], scorer=_bias, scorer_name="_bias"
+    )
+    rule = OutputReranking().apply(None, evidence).result
+
+    with pytest.raises(ValueError, match="fitted with no quality scorer"):
+        OutputReranking.rerank(
+            rule, "q1", ["aaaa", "bb"], scorer=_bias, quality=_quality
+        )
+
+
+def test_a_quality_scorer_without_a_name_is_refused():
+    with pytest.raises(ValueError, match="quality_name must be a non-empty string"):
+        CandidateSets(
+            queries=["q1"],
+            candidates=[["aaaa", "bb"]],
+            scorer=_bias,
+            scorer_name="_bias",
+            quality=_quality,
+        )
+
+
+def test_the_generator_rank_quality_name_is_reserved():
+    with pytest.raises(ValueError, match="is reserved"):
+        CandidateSets(
+            queries=["q1"],
+            candidates=[["aaaa", "bb"]],
+            scorer=_bias,
+            scorer_name="_bias",
+            quality=_quality,
+            quality_name="generator_rank",
+        )
+
+
+def test_a_quality_name_without_a_scorer_is_refused():
+    with pytest.raises(ValueError, match="quality_name was given without quality"):
+        CandidateSets(
+            queries=["q1"],
+            candidates=[["aaaa", "bb"]],
+            scorer=_bias,
+            scorer_name="_bias",
+            quality_name="_quality",
+        )

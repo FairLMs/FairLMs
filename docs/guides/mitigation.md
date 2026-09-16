@@ -12,7 +12,7 @@ from those declarations by the same matcher the metrics use.
 from fairlms.mitigation import MITIGATOR_REGISTRY, list_by_category
 
 list_by_category("post")
-# ['fairness_aware_reranking', 'group_aware_thresholding', 'score_calibration']
+# ['group_aware_thresholding', 'output_reranking', 'score_calibration']
 
 mitigator = MITIGATOR_REGISTRY["score_calibration"](method="isotonic")
 outcome = mitigator.apply(model, evidence)     # -> MitigationResult
