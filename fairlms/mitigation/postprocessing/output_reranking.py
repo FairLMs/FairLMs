@@ -86,13 +86,10 @@ def _rerank_one(
 class OutputReranking(Mitigator):
     """Reorder candidate generations by **declared** quality and bias scorers.
 
-    Selects, over the candidates ``{y_1, ..., y_k}`` generated for one query,
+    Selects, over the candidates generated for one query,
 
-    .. math::
-
-        \\hat{y}^* = \\arg\\max_{\\hat{y} \\in \\{\\hat{y}_1, \\dots,
-        \\hat{y}_k\\}} \\left[ \\lambda \\cdot q(\\hat{y})
-        + (1 - \\lambda) \\cdot f(\\hat{y}) \\right],
+        y* = argmax over y in {y_1, ..., y_k} of
+             lambda * q(y) + (1 - lambda) * f(y)
 
     and returns the full ordering that objective induces, not only its argmax.
     ``f`` is the declared **bias** scorer and ``q`` the declared **quality**
@@ -154,10 +151,12 @@ class OutputReranking(Mitigator):
     ...     quality_name="doctest-quality",
     ... )
     >>> outcome = OutputReranking(lambda_=0.6).apply(None, evidence)
-    >>> tuple(outcome.result["rankings"][0])
+    >>> ranking, = outcome.result["rankings"]
+    >>> tuple(ranking)
     ('she smiled', 'they smiled')
     >>> outcome = OutputReranking(lambda_=0.4).apply(None, evidence)
-    >>> tuple(outcome.result["rankings"][0])
+    >>> ranking, = outcome.result["rankings"]
+    >>> tuple(ranking)
     ('they smiled', 'she smiled')
     """
 
