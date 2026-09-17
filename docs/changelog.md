@@ -22,6 +22,16 @@ The backend revision is recorded in component provenance. Without a backend the
 three slots block by name exactly as before, so existing reports are unchanged;
 the registry now holds 14 diagnostics.
 
+**CrowS-Pairs orientation fixed.** The loader had swapped `sent_more` and
+`sent_less` for the 218 anti-stereotype rows. In CrowS-Pairs `sent_more` is the
+more stereotyping sentence in every row, and the published metric counts a
+preference for it regardless of the `stereo_antistereo` label. With the fix,
+`CrowSPairsScore` on `bert-base-uncased` reproduces Nangia et al. (2020) to one
+decimal: 60.5 overall, 61.1 on stereotype pairs, 56.9 on anti-stereotype pairs
+(previously 58.5 / 61.1 / 43.1). Scores reported with earlier development
+versions on anti-stereotype rows, and therefore the gender category, were
+inverted.
+
 **Bundled corpora consolidated.** 84 files under `fairlms/definition/` that were
 byte-identical to a copy under `fairlms/data/` were deleted, removing
 359,582,594 bytes. `fairlms/data/` is now the single source, and

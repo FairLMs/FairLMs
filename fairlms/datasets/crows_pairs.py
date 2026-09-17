@@ -16,7 +16,10 @@ PathLike = Union[str, Path]
 class CrowSPairs(FairnessDataset):
     """Load CrowS-Pairs as stereotype / anti-stereotype sentence pairs.
 
-    Each example is a dict::
+    ``stereotype`` is always the dataset's ``sent_more`` (the more stereotyping
+    sentence) and ``anti_stereotype`` its ``sent_less``, for stereo and
+    anti-stereo rows alike, matching the published metric. Each example is a
+    dict::
 
         {
             "stereotype": str,
@@ -27,6 +30,7 @@ class CrowSPairs(FairnessDataset):
     """
 
     name = "crows_pairs"
+    data_origin = "bundled with the package"
 
     def __init__(
         self,
@@ -48,16 +52,21 @@ class CrowSPairs(FairnessDataset):
         if self.bias_type is not None:
             df = df[df["bias_type"] == self.bias_type]
 
+        # ``sent_more`` is the more stereotyping sentence in *every* row; the
+        # ``stereo_antistereo`` label says whether the pair demonstrates or
+        # violates a stereotype about a disadvantaged group, not which side is
+        # more stereotypical. The published metric (Nangia et al., 2020,
+        # metric.py) therefore counts a preference for ``sent_more`` for both
+        # labels, and so does this loader. Swapping the sides for the 218
+        # anti-stereotype rows, as an earlier version did, inverted their
+        # contribution and lowered the bert-base-uncased score from the
+        # published 60.5 to 58.5.
         pairs: List[dict] = []
         for _, row in df.iterrows():
-            if row["stereo_antistereo"] == "stereo":
-                stereo, anti = row["sent_more"], row["sent_less"]
-            else:
-                stereo, anti = row["sent_less"], row["sent_more"]
             pairs.append(
                 {
-                    "stereotype": stereo,
-                    "anti_stereotype": anti,
+                    "stereotype": row["sent_more"],
+                    "anti_stereotype": row["sent_less"],
                     "bias_type": row.get("bias_type"),
                     "stereo_antistereo": row.get("stereo_antistereo"),
                 }

@@ -24,6 +24,8 @@ python examples/scorer_rate_gap_diagnostic.py
 python examples/scorer_distribution_gap_diagnostic.py
 python examples/scorer_counterfactual_sensitivity_diagnostic.py
 python examples/crows_pairs_score.py
+python examples/reproduce_crows_pairs.py        # published CrowS-Pairs values, ~4 min on CPU
+python examples/reproduce_seat_biasbench.py     # published SEAT effect sizes, downloads six sentence files
 ```
 
 ## Scripts
