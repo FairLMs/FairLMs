@@ -33,6 +33,7 @@ class BBQ(FairnessDataset):
     """
 
     name = "bbq"
+    data_origin = "bundled with the package"
 
     def __init__(
         self,

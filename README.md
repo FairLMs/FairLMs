@@ -412,7 +412,7 @@ fairlms/
 │   ├── data.py     #   Validated input containers (WordSets, ProbeSet, …)
 │   └── functional.py #  sklearn.metrics-style functions (model-free metrics)
 ├── diagnostics/    # Dataset/result-table evidence, applicability, and reports
-├── datasets/       # CrowSPairs, StereoSet, BBQ, BiasInBios, WinoBias, …
+├── datasets/       # CrowSPairs, StereoSet, BBQ, BOLD, HONEST, GAP, …
 ├── models/         # HuggingFaceModel, OpenAIModel, load_* helpers
 ├── utils/          # PLL / masking / association / path helpers
 ├── data/           # Bundled CrowS-Pairs + BBQ files; exports WEAT/SEAT word sets
@@ -426,16 +426,36 @@ Every metric exposes the same method: `compute(...)`.
 
 ## Datasets
 
+Eighteen loaders behind one interface. `fairlms/data/` ships two of the corpora;
+the rest are fetched or pointed at. See [Loaders](docs/registry/loaders.md) for
+the generated table with every constructor argument.
+
 | Class | Source | Notes |
 |-------|--------|--------|
 | `CrowSPairs` | Bundled CSV under `fairlms/data/crows_pairs/` | Stereotype / anti pairs |
-| `StereoSet` | Hugging Face (`stereoset` / `McGill-NLP/stereoset`) | Pairs or triples |
 | `BBQ` | Bundled jsonl under `fairlms/data/bbq/` | Optional `context_condition` filter |
+| `StereoSet` | Hugging Face (`stereoset` / `McGill-NLP/stereoset`) | Pairs or triples |
 | `BiasInBios` | Hugging Face `LabHC/bias_in_bios` | Profession / gender helpers |
 | `WinoBias` | Hugging Face `wino_bias` | Occupation direction helpers |
 | `XNLIReligionPairs` | Hugging Face XNLI + templates | Religion swap pairs |
+| `BOLD` | Hugging Face `AmazonScience/bold` | Generation prompts, five domains |
+| `HONEST` | Hugging Face `MilaNLProc/honest` | Masked templates, `binary` / `queer_nonqueer` |
+| `RealToxicityPrompts` | Hugging Face `allenai/real-toxicity-prompts` | `challenging_only`, `min_toxicity` filters |
+| `HolisticBias` | Hugging Face `fairnlp/holistic-bias` | `sentences` or `nouns`, per-axis counts |
+| `EquityEvaluationCorpus` (`EEC`) | Hugging Face `peixian/equity_evaluation_corpus` | Matched gender / race templates |
+| `GAP` | Hugging Face `google-research-datasets/gap` | Balanced masculine / feminine pronouns |
+| `Winogender` | Hugging Face `oskarvanderwal/winogender` | Occupation skew helpers need a local `root=` |
+| `BiasNLI` | Local `root=` | The retained three-column release, verbatim |
+| `RedditBias` | Local `root=` | `comments` / `pairs` / `phrases`, five axes |
+| `GrepBiasIR` | Local `root=` | Query/document pairs, gendered writings |
+| `UnQover` | Local `root=` | Streams the multi-GB slotmaps |
+| `TrustGPT` | Bundled templates + your norms | No data release; prompts are built |
 
-Loaders prefer canonical files in `fairlms/data/`, then fall back to legacy copies under `definition/` so existing scripts keep working.
+Bundled loaders prefer canonical files in `fairlms/data/`, then fall back to
+legacy copies under `definition/` so existing scripts keep working. The four
+`root=` benchmarks are distributed only from their own project pages and never
+download anything; the loader raises with the project URL if you have not
+pointed it at a copy.
 
 ### Bundled word sets
 

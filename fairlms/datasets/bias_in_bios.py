@@ -47,6 +47,7 @@ class BiasInBios(FairnessDataset):
     """
 
     name = "bias_in_bios"
+    data_origin = "Hugging Face Hub, downloaded at first use"
 
     def __init__(
         self,

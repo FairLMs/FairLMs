@@ -60,6 +60,7 @@ class WinoBias(FairnessDataset):
     """
 
     name = "wino_bias"
+    data_origin = "Hugging Face Hub, downloaded at first use"
 
     def __init__(
         self,

@@ -41,9 +41,10 @@ instead of returning a zero that reads as a finding. See
 | **Intrinsic** | 11 metrics | 4 | 4 |
 | **Extrinsic** | 3 | 7 | 4 |
 
-Six benchmark loaders (CrowS-Pairs, BBQ, StereoSet, Bias in Bios, WinoBias,
-XNLI) fill the same `data` argument you can pass by hand, plus eight bundled
-WEAT / SEAT word sets.
+Eighteen benchmark loaders (CrowS-Pairs, BBQ, StereoSet, Bias in Bios,
+WinoBias, XNLI, BOLD, HONEST, RealToxicityPrompts, HolisticBias, EEC, GAP,
+Winogender, Bias-NLI, RedditBias, Grep-BiasIR, UnQover, TrustGPT) fill the same
+`data` argument you can pass by hand, plus eight bundled WEAT / SEAT word sets.
 
 Eleven dataset diagnostics: axis representativeness (`b_rep`), stereotype
 leakage (`b_leak`), five of the eight construction-vector slots (`b_min`,

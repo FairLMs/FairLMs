@@ -15,6 +15,12 @@ class FairnessDataset(ABC):
 
     name: str = "dataset"
 
+    #: Where :meth:`load` gets its bytes, as the generated Loaders table prints
+    #: it. Declared rather than inferred: the loaders reach the same data three
+    #: different ways (bundled file, Hub download, caller-supplied directory)
+    #: and no single import or call name distinguishes them.
+    data_origin: str = "bundled with the package"
+
     @abstractmethod
     def load(self) -> Sequence[Any]:
         """Load and return examples for this dataset."""
