@@ -37,6 +37,7 @@ class StereoSet(FairnessDataset):
     """
 
     name = "stereoset"
+    data_origin = "Hugging Face Hub, downloaded at first use"
 
     def __init__(
         self,

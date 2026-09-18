@@ -11,6 +11,33 @@ undefined scores, run provenance, revision controls, real offline model tests,
 source archive validation, and corpus checksums/attribution. No upstream release
 or paper update is implied by this development version.
 
+**Twelve benchmark loaders added.** The registry goes from 6 loaders to 18,
+covering the remaining datasets studied in the accompanying survey: `BOLD`,
+`HONEST`, `RealToxicityPrompts`, `HolisticBias`, `EquityEvaluationCorpus`
+(alias `EEC`), `GAP`, `Winogender`, `BiasNLI`, `RedditBias`, `GrepBiasIR`,
+`UnQover` and `TrustGPT`. Each subclasses `FairnessDataset` and returns
+`load()` examples a metric's `data` argument accepts.
+
+Where the bytes come from is now declared rather than inferred: every loader
+carries a `data_origin` string, and the generated
+[Loaders](registry/loaders.md) table groups by it. Seven of the new loaders
+download published data files from the Hugging Face Hub at first use, via
+`huggingface_hub.hf_hub_download` rather than `datasets.load_dataset`, because
+several of those repositories still ship a loading script that `datasets>=3`
+refuses to run. Four benchmarks are distributed only from their own project
+page and take a `root=` instead of downloading anything; `TrustGPT` has no data
+release at all, so its loader reproduces the three published prompt templates
+and takes the social norms from the caller. Nothing new is vendored into the
+wheel.
+
+Two details worth knowing before you use them. The archive published under the
+Bias-NLI name is a three-column SNLI-shaped release, not the template-expanded
+inference set of Dev et al. (2020), and there is no deterministic join between
+the two, so `BiasNLI` returns the release verbatim and asserts nothing about
+how individual rows were built. `UnQover` streams its slotmaps incrementally,
+because the released files reach 2.2 GB and `json.load` on the largest would
+need tens of gigabytes before `n_max` could take effect.
+
 **Construction vector complete.** `b_equiv`, `b_gram` and `b_diff_dep` are
 implemented as `SemanticEquivalence`, `GrammarConsistency` and
 `DependencyDepthDisparity`, each taking an optional `backend=` that satisfies
@@ -21,6 +48,16 @@ dependencies), `LanguageToolGrammarBackend` (`fairlms[grammar]`) and
 The backend revision is recorded in component provenance. Without a backend the
 three slots block by name exactly as before, so existing reports are unchanged;
 the registry now holds 14 diagnostics.
+
+**CrowS-Pairs orientation fixed.** The loader had swapped `sent_more` and
+`sent_less` for the 218 anti-stereotype rows. In CrowS-Pairs `sent_more` is the
+more stereotyping sentence in every row, and the published metric counts a
+preference for it regardless of the `stereo_antistereo` label. With the fix,
+`CrowSPairsScore` on `bert-base-uncased` reproduces Nangia et al. (2020) to one
+decimal: 60.5 overall, 61.1 on stereotype pairs, 56.9 on anti-stereotype pairs
+(previously 58.5 / 61.1 / 43.1). Scores reported with earlier development
+versions on anti-stereotype rows, and therefore the gender category, were
+inverted.
 
 **Bundled corpora consolidated.** 84 files under `fairlms/definition/` that were
 byte-identical to a copy under `fairlms/data/` were deleted, removing

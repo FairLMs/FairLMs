@@ -37,10 +37,18 @@ the public API. The wrapper in `fairlms/metrics/` is the stable surface;
 
 Subclass `FairnessDataset`, implement `load()`, and export the class from
 `fairlms/datasets/__init__.py`. The export list is what the generated
-[Loaders](registry/loaders.md) page reads. Prefer Hub download over vendoring;
-only CrowS-Pairs and BBQ are bundled, and anything you add under
-`fairlms/data/` must also be declared in `[tool.setuptools.package-data]` or it
-will not ship in the wheel.
+[Loaders](registry/loaders.md) page reads, and the first sentence of the class
+docstring is the description it prints, so make it say what `load()` returns.
+
+Set `data_origin` to where the bytes come from; the table groups loaders by it.
+Prefer Hub download over vendoring. Only CrowS-Pairs and BBQ are bundled, and
+anything you add under `fairlms/data/` must also be declared in
+`[tool.setuptools.package-data]` or it will not ship in the wheel. Fetch a
+published data file with `fairlms.datasets._sources.hub_file` rather than
+`datasets.load_dataset`: several benchmark repositories still ship a loading
+script, which `datasets>=3` will not run. For a benchmark with no Hub release,
+take a `root=` and resolve it with `_sources.resolve_root`, whose error names
+the project page and the layout you expected.
 
 ## Adding a diagnostic
 

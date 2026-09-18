@@ -65,9 +65,10 @@ help(CrowSPairsScore)     # "Pseudo-log-likelihood CrowS-Pairs Score (Nangia et 
 
 Benchmarks carry their own licenses and citation requirements, independent of
 this library's MIT license. CrowS-Pairs and BBQ are redistributed with the
-package; StereoSet, Bias in Bios, WinoBias and XNLI are downloaded from the
-Hugging Face Hub at first use. See [Loaders](registry/loaders.md) for which is
-which, and cite the benchmark authors for any dataset you evaluate on.
+package; eleven others are downloaded from the Hugging Face Hub at first use;
+Bias-NLI, RedditBias, Grep-BiasIR and UnQover you supply yourself. See
+[Loaders](registry/loaders.md) for which is which, and cite the benchmark
+authors for any dataset you evaluate on.
 
 ## What to record for reproducibility
 

@@ -91,6 +91,7 @@ nav:
       - Utils: api/utils.md
   - About:
       - Comparison with related tools: comparison.md
+      - Reproduction of published values: validation.md
       - Changelog: changelog.md
       - Citing FairLMs: citation.md
       - License: license.md

@@ -51,6 +51,10 @@ dependencies = [
     "torch>=2.0",
     "transformers>=4.38",
     "datasets>=2.19",
+    # Used directly by fairlms/datasets/_sources.py. It already arrives as a
+    # transitive dependency of transformers and datasets; declared here because
+    # the loaders import it themselves rather than going through load_dataset.
+    "huggingface-hub>=0.23",
     # These three are imported at module scope inside fairlms/definition/, and
     # fairlms.metrics eagerly imports every family, so `import fairlms` fails
     # without them. They are requirements, not extras:

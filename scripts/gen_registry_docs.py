@@ -110,31 +110,47 @@ def loaders_page() -> str:
     import fairlms.datasets as DS
     from fairlms.datasets import FairnessDataset
 
-    rows = []
+    classes = []
     for name in sorted(DS.__all__):
         cls = getattr(DS, name)
-        if not (
+        if (
             inspect.isclass(cls)
             and issubclass(cls, FairnessDataset)
             and cls is not FairnessDataset
+            # An alias is a second export bound to a class already listed under
+            # its own __name__ (EEC -> EquityEvaluationCorpus).
+            and cls.__name__ == name
         ):
-            continue
-        src = inspect.getsource(inspect.getmodule(cls))
-        if "load_dataset(" in src:
-            origin = "Hugging Face Hub, downloaded at first use"
-        else:
-            origin = "bundled with the package"
+            classes.append((name, cls))
+
+    alias_names = {
+        cls: sorted(
+            n for n in DS.__all__ if getattr(DS, n, None) is cls and n != cls.__name__
+        )
+        for _, cls in classes
+    }
+
+    rows = []
+    origins = {}
+    for name, cls in classes:
         params = [
             p for p in inspect.signature(cls.__init__).parameters if p not in ("self",)
         ]
+        origins.setdefault(cls.data_origin, []).append(name)
         rows.append(
-            "| `{name}` | {summary} | {origin} | {params} |".format(
+            "| `{name}` | {alias} | {summary} | {origin} | {params} |".format(
                 name=name,
+                alias=_fmt(alias_names[cls]),
                 summary=_summary(cls),
-                origin=origin,
+                origin=cls.data_origin,
                 params=_fmt(params),
             )
         )
+
+    breakdown = "\n".join(
+        f"- **{origin}**: {_fmt(sorted(names))}"
+        for origin, names in sorted(origins.items())
+    )
 
     return (
         HEADER
@@ -142,11 +158,15 @@ def loaders_page() -> str:
         + f"{len(rows)} dataset loaders behind one interface: each subclasses "
         "`FairnessDataset` and exposes `load()`, returning examples that a "
         "metric's `data` argument accepts directly.\n\n"
-        "Each benchmark retains its own license. Two are bundled with the "
-        "package (CrowS-Pairs, BBQ); the rest are fetched from the Hugging "
-        "Face Hub on first use.\n\n"
-        "| Loader | Description | Data origin | Constructor arguments |\n"
-        "|---|---|---|---|\n" + "\n".join(rows) + "\n"
+        "Each benchmark retains its own license, and where it comes from "
+        "differs. Some are redistributed with the package, some are pulled "
+        "from the Hugging Face Hub the first time you load them, and some are "
+        "only distributed from their own project page, so their loader needs a "
+        "`root=` pointing at your copy and will not download anything:\n\n"
+        + breakdown
+        + "\n\n"
+        "| Loader | Alias | Description | Data origin | Constructor arguments |\n"
+        "|---|---|---|---|---|\n" + "\n".join(rows) + "\n"
     )
 
 
