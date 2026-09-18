@@ -7,7 +7,7 @@ name: publish
 #
 #   https://pypi.org/manage/account/publishing/
 #     PyPI project name : fairlms
-#     Owner             : michaellarionov
+#     Owner             : FairLMs/FairLMs
 #     Repository name   : FairLMs
 #     Workflow name     : publish.yml
 #     Environment name  : pypi

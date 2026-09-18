@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0.dev0
+## 0.5.0
 
 Corrected StereoSet roles/context and CAT LMS comparisons; connected public
 SelfDebiasing generation to probability damping; required projection layer and
