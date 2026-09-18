@@ -7,7 +7,7 @@ from typing import List, Optional, Sequence, Union
 
 import pandas as pd
 
-from fairlms.datasets._sources import hub_file
+from fairlms.datasets._sources import hub_file, none_if_na
 from fairlms.datasets.base import FairnessDataset, optional_limit
 
 PathLike = Union[str, Path]
@@ -106,10 +106,13 @@ class EquityEvaluationCorpus(FairnessDataset):
 
         df = pd.read_csv(self._source_path())
         df = df.rename(columns=_COLUMNS)
-        df = df.where(pd.notna(df), None)
 
         examples: List[dict] = []
-        for row in df.to_dict("records"):
+        for raw in df.to_dict("records"):
+            # Per value rather than frame-wide: under pandas 3 a `str` column's
+            # gaps survive `df.where(pd.notna(df), None)` as `nan`, and `nan is
+            # not None` would put every row on the race axis.
+            row = {key: none_if_na(value) for key, value in raw.items()}
             # The race half of the corpus is the first-name rows; the rest
             # substitute a pronoun or noun phrase and vary gender only.
             axis = "race" if row.get("race") is not None else "gender"

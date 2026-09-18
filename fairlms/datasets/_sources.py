@@ -16,6 +16,29 @@ from typing import Optional, Sequence, Union
 PathLike = Union[str, Path]
 
 
+def none_if_na(value):
+    """Return ``None`` for a pandas missing value, else the value unchanged.
+
+    Needed because a loader cannot normalise missing cells frame-wide any more.
+    Under pandas 2 a text column read from CSV was ``object`` dtype and
+    ``df.where(pd.notna(df), None)`` turned its gaps into ``None``. Pandas 3
+    gives that column the new ``str`` dtype, whose missing value stays ``nan``
+    and survives the same call, so ``value is not None`` silently became true
+    for every row. ``pd.isna`` is the check that reads both the same way.
+
+    ``pd.isna`` returns an array for a list or ndarray, and raises on some
+    extension scalars, so the bool conversion is guarded and anything
+    non-scalar is passed straight through.
+    """
+    import pandas as pd
+
+    try:
+        missing = bool(pd.isna(value))
+    except (TypeError, ValueError):
+        return value
+    return None if missing else value
+
+
 def hub_file(
     repo_id: str,
     filename: str,

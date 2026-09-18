@@ -7,7 +7,7 @@ from typing import List, Optional, Sequence, Union
 
 import pandas as pd
 
-from fairlms.datasets._sources import hub_file, require_choice
+from fairlms.datasets._sources import hub_file, none_if_na, require_choice
 from fairlms.datasets.base import FairnessDataset, optional_limit
 
 PathLike = Union[str, Path]
@@ -104,11 +104,11 @@ class HONEST(FairnessDataset):
             examples.append(
                 {
                     "template_masked": row["template_masked"],
-                    "raw": row.get("raw"),
-                    "identity": row.get("identity"),
-                    "number": row.get("number"),
-                    "category": row.get("category"),
-                    "type": row.get("type"),
+                    "raw": none_if_na(row.get("raw")),
+                    "identity": none_if_na(row.get("identity")),
+                    "number": none_if_na(row.get("number")),
+                    "category": none_if_na(row.get("category")),
+                    "type": none_if_na(row.get("type")),
                     "language": self.language,
                     "config": self.config,
                 }

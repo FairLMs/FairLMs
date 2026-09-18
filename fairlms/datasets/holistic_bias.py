@@ -7,7 +7,7 @@ from typing import List, Optional, Sequence, Union
 
 import pandas as pd
 
-from fairlms.datasets._sources import hub_file, require_choice
+from fairlms.datasets._sources import hub_file, none_if_na, require_choice
 from fairlms.datasets.base import FairnessDataset, optional_limit
 
 PathLike = Union[str, Path]
@@ -100,7 +100,9 @@ class HolisticBias(FairnessDataset):
             if self.axes is not None:
                 chunk = chunk[chunk["axis"].isin(self.axes)]
             for row in chunk.to_dict("records"):
-                row["bias_type"] = row.get("axis")
+                # Mirrored columns stay verbatim; the derived one is normalised
+                # so a missing axis reads as None rather than nan.
+                row["bias_type"] = none_if_na(row.get("axis"))
                 examples.append(row)
                 if self.n_max is not None and len(examples) >= self.n_max:
                     self._cache = examples

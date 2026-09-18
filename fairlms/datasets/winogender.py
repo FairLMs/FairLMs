@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 
-from fairlms.datasets._sources import hub_file
+from fairlms.datasets._sources import hub_file, none_if_na
 from fairlms.datasets.base import FairnessDataset, optional_limit
 
 PathLike = Union[str, Path]
@@ -129,12 +129,22 @@ class Winogender(FairnessDataset):
         for row in df.to_dict("records"):
             sentid = row.get("sentid")
             occupation, participant, answer, gender = self._from_sentid(sentid)
-            # Prefer the mirror's own columns where it has them.
-            occupation = row.get("occupation", occupation) or occupation
-            participant = row.get("participant", participant) or participant
-            gender = row.get("gender", gender) or gender
-            if row.get("label") is not None and answer is None:
-                answer = row.get("label")
+
+            def prefer(column, parsed):
+                """The mirror's own column when it has one, else the parse.
+
+                Not ``row.get(column) or parsed``: a missing cell is ``nan``,
+                which is truthy, so the ``or`` would hand back the gap instead
+                of the value parsed out of ``sentid``.
+                """
+                value = none_if_na(row.get(column))
+                return parsed if value is None or value == "" else value
+
+            occupation = prefer("occupation", occupation)
+            participant = prefer("participant", participant)
+            gender = prefer("gender", gender)
+            if answer is None:
+                answer = none_if_na(row.get("label"))
 
             if self.gender is not None and gender != self.gender:
                 continue

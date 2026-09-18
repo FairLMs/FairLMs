@@ -303,6 +303,11 @@ def test_eec_renames_the_release_header_and_labels_the_axis(eec_root):
     assert rows[0]["emotion_word"] == "angry"
     assert rows[0]["bias_type"] == "race"
     assert rows[1]["bias_type"] == "gender"
+    # A missing cell must arrive as None, not as nan. Pandas 3 gives text
+    # columns the `str` dtype, whose gaps survive a frame-wide
+    # `where(pd.notna(df), None)`; `nan is not None` then put every row on the
+    # race axis, including the 2,880 that vary gender alone.
+    assert rows[1]["race"] is None
     assert [r["id"] for r in EEC(root=eec_root, bias_type="gender").load()] == [
         "2018-En-mystery-11722"
     ]
@@ -392,6 +397,24 @@ def test_winogender_unpacks_the_fields_packed_into_sentid(winogender_root):
     assert [
         r["gender"] for r in Winogender(root=winogender_root, gender="female").load()
     ] == ["female"]
+
+
+def test_winogender_prefers_sentid_over_an_empty_mirror_column(tmp_path):
+    """A blank mirror column is `nan`, which is truthy; the parse must win."""
+    directory = tmp_path / "Winogender" / "data"
+    directory.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "sentid": ["technician.customer.1.male.txt"],
+            "sentence": ["... he ..."],
+            "occupation": [None],
+            "gender": [None],
+        }
+    ).to_csv(directory / "all_sentences.tsv", sep="\t", index=False)
+
+    row = Winogender(root=tmp_path).load()[0]
+    assert row["occupation"] == "technician"
+    assert row["gender"] == "male"
 
 
 def test_winogender_occupation_skew_is_a_probability(winogender_root):
